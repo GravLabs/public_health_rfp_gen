@@ -2,7 +2,8 @@ param envName string
 param registryName string
 param location string
 param tags object = {}
-param logAnalyticsWorkspaceId string
+param logAnalyticsCustomerId string      // workspace GUID (customerId property)
+param logAnalyticsResourceId string      // full resource ID (for listKeys)
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: registryName
@@ -24,8 +25,8 @@ resource containerAppsEnv 'Microsoft.App/managedEnvironments@2023-11-02-preview'
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
-        customerId: logAnalyticsWorkspaceId
-        sharedKey: listKeys(resourceId('Microsoft.OperationalInsights/workspaces', split(logAnalyticsWorkspaceId, '/')[8]), '2022-10-01').primarySharedKey
+        customerId: logAnalyticsCustomerId
+        sharedKey: listKeys(logAnalyticsResourceId, '2022-10-01').primarySharedKey
       }
     }
   }

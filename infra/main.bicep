@@ -55,7 +55,7 @@ module keyVault 'modules/keyvault.bicep' = {
   name: 'keyvault'
   scope: rg
   params: {
-    name: '${abbrs.keyVaultVaults}pubhealth-${resourceToken}'
+    name: 'kvph${resourceToken}'
     location: location
     tags: tags
     identityPrincipalId: identity.outputs.principalId
@@ -141,7 +141,8 @@ module containerApps 'modules/container-apps.bicep' = {
     registryName: '${abbrs.containerRegistryRegistries}pubhealth${resourceToken}'
     location: location
     tags: tags
-    logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsId
+    logAnalyticsCustomerId: monitoring.outputs.logAnalyticsWorkspaceId
+    logAnalyticsResourceId: monitoring.outputs.logAnalyticsId
   }
 }
 
@@ -170,6 +171,7 @@ module botService 'modules/bot-service.bicep' = {
     tags: tags
     messagingEndpoint: botMessagingEndpoint
     microsoftAppId: identity.outputs.clientId
+    tenantId: tenant().tenantId
   }
 }
 

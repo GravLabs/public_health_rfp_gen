@@ -3,10 +3,10 @@ param location string
 param tags object = {}
 param identityPrincipalId string
 param gptModelName string = 'gpt-4o'
-param gptModelVersion string = '2024-08-06'
+param gptModelVersion string = '2025-01-01'
 param embeddingModelName string = 'text-embedding-3-small'
 
-resource openAi 'Microsoft.CognitiveServices/accounts@2023-10-01-preview' = {
+resource openAi 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: name
   location: location
   tags: tags

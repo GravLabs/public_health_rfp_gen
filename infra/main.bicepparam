@@ -7,7 +7,7 @@ param ownerEmail = readEnvironmentVariable('AZURE_OWNER_EMAIL', 'owner@example.c
 
 // Model configuration
 param openAiModelName = 'gpt-4o'
-param openAiModelVersion = '2024-08-06'
+param openAiModelVersion = '2025-01-01'
 param embeddingModelName = 'text-embedding-3-small'
 
 // Cost controls
