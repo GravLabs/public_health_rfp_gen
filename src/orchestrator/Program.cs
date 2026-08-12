@@ -1,4 +1,5 @@
 using Azure.Identity;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Azure.Search.Documents;
 using Microsoft.SemanticKernel;
 using PubHealthRfp.Orchestrator.Models;
@@ -72,8 +73,7 @@ app.MapPost("/generate", async (
     var draft = await orchestrator.GenerateDraftAsync(request, ct);
     return Results.Ok(draft);
 })
-.WithName("GenerateRfpDraft")
-.WithOpenApi();
+.WithName("GenerateRfpDraft");
 
 // Streaming endpoint — yields NDJSON section events as each section completes,
 // allowing the Teams bot to update the progress card in real time.
@@ -98,8 +98,7 @@ app.MapPost("/generate/stream", async (
         await httpContext.Response.Body.FlushAsync(ct);
     }
 })
-.WithName("GenerateRfpStream")
-.WithOpenApi();
+.WithName("GenerateRfpStream");
 
 app.MapGet("/health/ready", () => Results.Ok(new { status = "ready", timestamp = DateTimeOffset.UtcNow }))
    .WithName("Readiness");

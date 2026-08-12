@@ -32,7 +32,7 @@ public class SearchPlugin(SearchClient searchClient)
             SemanticSearch = new SemanticSearchOptions
             {
                 SemanticConfigurationName = "pubhealth-rfp-semantic",
-                QueryCaption = new QueryCaptionOptions(QueryCaptionType.Extractive),
+
             },
             Select = { "content", "rfp_id", "section_type", "program_area", "federal_sponsor", "fiscal_year", "chunk_index", "context_summary" }
         };

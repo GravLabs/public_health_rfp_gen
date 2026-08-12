@@ -199,7 +199,7 @@ public class RfpOrchestrationService(
 
         var response = await chat.GetChatMessageContentAsync(history, settings, kernel, cancellationToken);
 
-        var usage = response.Metadata?["Usage"] as Azure.AI.OpenAI.ChatTokenUsage;
+        var usage = response.Metadata?["Usage"] as OpenAI.Chat.ChatTokenUsage;
         return (
             response.Content ?? string.Empty,
             usage?.InputTokenCount ?? 0,
