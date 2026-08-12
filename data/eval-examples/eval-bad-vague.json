@@ -1,0 +1,45 @@
+{
+  "id": "eval-bad-vague",
+  "label": "FAIL — Completeness Failure: Generic Boilerplate with No Specific Metrics or Requirements",
+  "rfp_id": "Public Health Labs-RFP-2024-DATAGOV-043",
+  "program_area": "Laboratory Data Systems — LIMS Modernization",
+  "extracted_parameters": {
+    "total_funding": 5100000,
+    "period_of_performance_months": 36,
+    "cost_sharing_required": false,
+    "federal_sponsor": "CDC / OID / DPHCID",
+    "award_range_min": 100000,
+    "award_range_max": 400000,
+    "estimated_awards_min": 18,
+    "estimated_awards_max": 24
+  },
+  "generated_draft": {
+    "background": "Modern laboratory information management systems are essential for public health laboratory operations. State laboratories need updated technology to improve efficiency and data quality. This award supports LIMS modernization efforts across state public health laboratories.",
+    "funding_parameters": "Total available funding: $5,100,000. Awards: 18–24. Range per laboratory: $100,000–$400,000. Period of performance: 36 months. Federal sponsor: CDC. Cost sharing: not required.",
+    "eligibility": "State public health laboratory. CLIA certification. Support from state health department.",
+    "scope_of_work": "1. Implement or upgrade LIMS. 2. Improve electronic laboratory reporting. 3. Develop data governance policies. 4. Integrate with surveillance systems.",
+    "reporting_requirements": "Regular progress reports. Final report.",
+    "budget_requirements": "LIMS costs allowable. Staff time allowable.",
+    "evaluation_criteria": "Technical approach (40 points). Data governance (30 points). Budget (30 points).",
+    "submission_instructions": "Submit via Public Health Labs Grants Portal before the deadline."
+  },
+  "evaluation_scores": {
+    "completeness": 0.22,
+    "parameter_accuracy": 0.85,
+    "compliance": 0.61,
+    "groundedness": 0.41,
+    "coherence": 0.55
+  },
+  "gate_decision": "FAIL",
+  "failure_reasons": [
+    "completeness: background section 43 words — minimum 150 required; missing DMI context, HL7 FHIR R4 mandate, COVID data gap rationale",
+    "completeness: eligibility section missing LIMS age documentation requirement, bi-directional EHR requirement, LIMS gap analysis requirement",
+    "completeness: scope_of_work section 44 words — minimum 250 required; missing all specific metrics (99.5% uptime, ≤4hr RTO, RBAC, SOC 2, AIMS Platform milestones)",
+    "completeness: reporting_requirements 'regular progress reports' not specific — source requires milestone reports at 6/12/18/24 months + quarterly operations reports",
+    "completeness: budget_requirements missing LIMS SaaS vs perpetual licensing allowability, SOC 2 assessment allowability, capital equipment restrictions",
+    "completeness: submission_instructions missing deadline date, page limit, required document list",
+    "completeness: evaluation_criteria collapsed from 5 source criteria to 3 generic categories",
+    "groundedness: 'CDC' as sole sponsor — source specifies 'CDC / OID / Data Modernization Initiative' with specific program office"
+  ],
+  "evaluator_notes": "Extreme completeness failure — this is a skeleton draft with generic boilerplate that contains almost none of the specific technical requirements from the source RFP. Every section falls below minimum word count thresholds. No specific metrics, milestones, standards (HL7 FHIR R4, RBAC, SOC 2, AIMS Platform), or compliance language appear. This represents the failure mode of a model that understands the general topic but has not grounded its output in the specific RFP requirements. The parameter accuracy is reasonable (85%) because the model correctly extracted the numerical parameters, but the substantive content is unusable."
+}

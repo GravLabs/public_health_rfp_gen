@@ -1,0 +1,35 @@
+{
+  "id": "eval-good-03",
+  "label": "PASS — PulseNet Foodborne WGS, Accurate Parameters, Minimal Hallucination",
+  "rfp_id": "Public Health Labs-RFP-2021-FOOD-013",
+  "program_area": "Foodborne Disease — PulseNet WGS",
+  "extracted_parameters": {
+    "total_funding": 4100000,
+    "period_of_performance_months": 24,
+    "cost_sharing_required": false,
+    "federal_sponsor": "CDC / NCEZID / DFBMD",
+    "award_range_min": 100000,
+    "award_range_max": 250000,
+    "estimated_awards_min": 18,
+    "estimated_awards_max": 24
+  },
+  "generated_draft": {
+    "background": "PulseNet is the national molecular subtyping network for foodborne disease surveillance, coordinating WGS-based cluster detection for Salmonella, STEC O157 and non-O157, Listeria monocytogenes, Campylobacter, Vibrio, Yersinia, and Cyclospora. WGS has replaced PFGE as the gold standard because it provides sufficient resolution to detect common-source outbreaks that PFGE would classify as unrelated. This cooperative agreement funds state PulseNet laboratories to achieve and sustain WGS capacity for all priority foodborne pathogens, replacing legacy PFGE workflows by the 2022 sunset date.",
+    "funding_parameters": "Total available funding: $4,100,000. Awards: 18–24. Range per laboratory: $100,000–$250,000. Period of performance: 24 months (October 1, 2021 – September 30, 2023). Federal sponsor: CDC / NCEZID / DFBMD. Cost sharing: not required.",
+    "eligibility": "Public Health Labs member state laboratory with existing PulseNet participation and CLIA high-complexity certification. Active Salmonella and STEC culture capability with minimum 100 isolates submitted to PulseNet in prior 12 months. Bioinformatician or access to GHRU cloud pipeline. WGS instrument validated per CDC PulseNet WGS standards.",
+    "scope_of_work": "1. Achieve WGS capability for all seven priority PulseNet pathogens within 12 months of award (Salmonella, STEC O157/non-O157, Listeria, Campylobacter, Vibrio, Yersinia, Cyclospora where applicable). 2. Retire PFGE for Salmonella and STEC by September 30, 2022, aligned with national PulseNet PFGE sunset. 3. Submit ≥95% of all WGS isolates to PulseNet NCBI PathogenDB within 5 business days of culture. 4. Achieve ≥99% allele concordance with CDC PulseNet reference WGS on quarterly QA isolates.",
+    "reporting_requirements": "Monthly WGS submission reports by pathogen and timeliness. PulseNet proficiency test results per network protocol. Outbreak investigation after-action reports within 30 days of outbreak close. Final report 90 days post-period of performance.",
+    "budget_requirements": "Illumina library preparation kits and sequencing consumables allowable. CDC PulseNet proficiency participation and annual conference travel allowable. Bioinformatics cloud compute allowable. Culture media and identification reagents allowable. No capital equipment >$50,000 without prior Public Health Labs approval.",
+    "evaluation_criteria": "Current PulseNet WGS throughput (20 points). PFGE-to-WGS transition plan (25 points). Multi-pathogen WGS scope (25 points). Bioinformatics pipeline and data submission plan (20 points). Budget justification (10 points).",
+    "submission_instructions": "Deadline: November 12, 2021, 5:00 PM Eastern Time. Submit via Public Health Labs Grants Portal. Required: Narrative (16 pages), Budget, 12-month PulseNet isolate submission history, bioinformatician qualifications, current WGS validation documentation."
+  },
+  "evaluation_scores": {
+    "completeness": 1.0,
+    "parameter_accuracy": 1.0,
+    "compliance": 0.95,
+    "groundedness": 0.91,
+    "coherence": 0.94
+  },
+  "gate_decision": "PASS",
+  "evaluator_notes": "All sections present and word-count sufficient. Funding parameters match source: $4.1M, 24 months, 18-24 awards, $100K-$250K range. PFGE sunset date (September 2022) correctly stated. PulseNet pathogen list accurate (7 priority pathogens). No prohibited language. High groundedness — all technical claims traceable to source RFP and PulseNet program context."
+}

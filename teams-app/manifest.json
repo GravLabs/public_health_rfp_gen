@@ -1,0 +1,51 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "${{MICROSOFT_APP_ID}}",
+  "packageName": "com.aphl.pubhealth.rfp",
+  "developer": {
+    "name": "APHL / Graviton Labs",
+    "websiteUrl": "https://www.aphl.org",
+    "privacyUrl": "https://www.aphl.org/privacy",
+    "termsOfUseUrl": "https://www.aphl.org/terms"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "RFP Generator",
+    "full": "Public Health RFP Generator"
+  },
+  "description": {
+    "short": "AI-powered RFP generation for APHL member laboratories",
+    "full": "Generate, review, and manage public health laboratory RFPs using AI grounded on the APHL cooperative agreement corpus. Drafts are evaluated against 5 quality dimensions before being saved to SharePoint."
+  },
+  "accentColor": "#0369A1",
+  "bots": [
+    {
+      "botId": "${{MICROSOFT_APP_ID}}",
+      "scopes": ["personal", "team", "groupchat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal", "team", "groupchat"],
+          "commands": [
+            {
+              "title": "Draft RFP",
+              "description": "Generate a new RFP draft — describe the program area, funding, and period"
+            },
+            {
+              "title": "Help",
+              "description": "Show usage instructions and supported commands"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": []
+}

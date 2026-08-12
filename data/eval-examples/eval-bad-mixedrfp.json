@@ -1,0 +1,43 @@
+{
+  "id": "eval-bad-mixedrfp",
+  "label": "FAIL — Groundedness Failure: Content From Wrong RFP (Cross-Contamination)",
+  "rfp_id": "Public Health Labs-RFP-2023-H5N1-023",
+  "program_area": "Emerging Infectious Disease — H5N1 Preparedness",
+  "extracted_parameters": {
+    "total_funding": 3800000,
+    "period_of_performance_months": 24,
+    "cost_sharing_required": false,
+    "federal_sponsor": "CDC / NCIRD / ICIEID",
+    "award_range_min": 100000,
+    "award_range_max": 325000,
+    "estimated_awards_min": 14,
+    "estimated_awards_max": 18
+  },
+  "generated_draft": {
+    "background": "H5N1 highly pathogenic avian influenza (HPAI) represents a significant pandemic preparedness threat. Detection in U.S. dairy cattle in 2024 expanded potential human exposure vectors beyond the traditional poultry-handling population to include agricultural workers across the dairy supply chain. State public health laboratories require validated H5N1 detection capability to serve as first-line responders. This award also funds antimicrobial resistance surveillance through the ARLN network, including carbapenem-resistant Enterobacterales detection and Candida auris surveillance at ARLN-participating state laboratories.",
+    "funding_parameters": "Total available funding: $3,800,000. Awards: 14–18. Range per laboratory: $100,000–$325,000. Period of performance: 24 months. Federal sponsor: CDC / NCIRD / ICIEID. Cost sharing: not required.",
+    "eligibility": "State laboratory with influenza rRT-PCR capability, CLIA high-complexity certification, and ARLN membership. Partnership with state agriculture department and ARLN-designated regional laboratory.",
+    "scope_of_work": "1. Implement CDC-validated H5N1 rRT-PCR assay for human clinical specimens within 30 days of award. 2. Establish agricultural worker surveillance in partnership with state department of agriculture. 3. Implement broth microdilution susceptibility testing for CRE including CRPA and CRAB per ARLN protocol. 4. Implement Candida auris MALDI-TOF identification and antifungal susceptibility testing. 5. Submit ≥95% of carbapenemase-producing isolates to CDC AR Lab Network within 5 business days.",
+    "reporting_requirements": "Weekly H5N1 screening reports to CDC. ARLN monthly sentinel data to CDC NHSN. C. auris quarterly reports. Final report.",
+    "budget_requirements": "H5N1 PCR reagents, agricultural worker specimen transport allowable. ARLN BMD reagents, C. auris MALDI-TOF library allowable. ARLN proficiency costs allowable.",
+    "evaluation_criteria": "H5N1 detection capability (25 points). Agricultural worker surveillance (20 points). ARLN participation (30 points). C. auris testing (15 points). Budget (10 points).",
+    "submission_instructions": "Deadline: September 30, 2023. Submit via Public Health Labs Grants Portal. Required: Narrative, Budget, H5N1 capability documentation, ARLN designation letter."
+  },
+  "evaluation_scores": {
+    "completeness": 0.78,
+    "parameter_accuracy": 0.92,
+    "compliance": 0.81,
+    "groundedness": 0.29,
+    "coherence": 0.47
+  },
+  "gate_decision": "FAIL",
+  "failure_reasons": [
+    "groundedness: RFP-2023-H5N1-023 scope is exclusively H5N1/avian influenza preparedness — ARLN, CRE, CRPA, CRAB, and C. auris content is from RFP-2021-AMR-014, a different program",
+    "groundedness: ARLN membership is not an eligibility criterion in RFP-2023-H5N1-023",
+    "groundedness: BMD susceptibility testing, carbapenemase-producing isolate submission, and C. auris surveillance are wholly absent from RFP-2023-H5N1-023 scope",
+    "coherence: scope mixes two unrelated programs (H5N1 preparedness + AMR surveillance) in a single document with no logical connection",
+    "completeness: H5N1 agricultural worker surveillance scope insufficiently developed relative to source RFP requirements",
+    "completeness: BSL-3 specimen handling requirements for H5N1 missing from eligibility"
+  ],
+  "evaluator_notes": "RAG retrieval contamination failure — the model retrieved context from both RFP-2021-AMR-014 and RFP-2023-H5N1-023 and blended them into a single draft without noticing they are separate programs with incompatible scopes. The ARLN AMR content is completely out of scope for H5N1 preparedness. The groundedness evaluator correctly assigns a very low score (0.29) because the grounding documents for H5N1 don't support CRE or C. auris content. This is an important example for demonstrating that the evaluation pipeline catches RAG blending artifacts."
+}

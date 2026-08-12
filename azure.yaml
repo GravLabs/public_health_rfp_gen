@@ -1,0 +1,25 @@
+name: pubhealth-rfp-poc
+metadata:
+  template: pubhealth-rfp-poc@0.0.1
+
+infra:
+  provider: bicep
+  path: infra
+  module: main
+
+services:
+  api:
+    project: src/api
+    language: python
+    host: containerapp
+  orchestrator:
+    project: src/orchestrator
+    language: dotnet
+    host: containerapp
+
+hooks:
+  postprovision:
+    shell: sh
+    run: scripts/post-provision.sh
+    interactive: true
+    continueOnError: false

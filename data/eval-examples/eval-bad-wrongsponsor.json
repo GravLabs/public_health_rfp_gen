@@ -1,0 +1,43 @@
+{
+  "id": "eval-bad-wrongsponsor",
+  "label": "FAIL — Groundedness Failure: Wrong Federal Sponsor and Program Acronyms",
+  "rfp_id": "Public Health Labs-RFP-2022-NBS-018",
+  "program_area": "Newborn Screening — RUSP Expansion",
+  "extracted_parameters": {
+    "total_funding": 3400000,
+    "period_of_performance_months": 24,
+    "cost_sharing_required": false,
+    "federal_sponsor": "National Institutes of Health (NIH) / NICHD",
+    "award_range_min": 75000,
+    "award_range_max": 200000,
+    "estimated_awards_min": 18,
+    "estimated_awards_max": 24
+  },
+  "generated_draft": {
+    "background": "The NIH Newborn Screening program supports state laboratories in expanding testing panels to include conditions added to the Recommended Uniform Screening Panel (RUSP). Recent additions include spinal muscular atrophy (SMA), X-linked adrenoleukodystrophy (X-ALD), and Pompe disease. NIH NICHD funds state public health newborn screening laboratories to implement validated biochemical and molecular tests for RUSP conditions. All state laboratories must achieve CLSI validation standards and report outcomes to the NIH Baby's First Test program.",
+    "funding_parameters": "Total available funding: $3,400,000. Awards: 18–24. Range per laboratory: $75,000–$200,000. Period of performance: 24 months. Federal sponsor: NIH / NICHD. Cost sharing: not required.",
+    "eligibility": "State newborn screening laboratory performing RUSP-compliant testing. CLIA high-complexity certification. CAP NBS accreditation. Active NIH Baby's First Test reporting participant.",
+    "scope_of_work": "Implement validated testing for all RUSP additions in past 5 years. Achieve SMA genomic screening using SMN1 exon 7 deletion detection. Implement second-tier biochemical testing for lysosomal storage disorders. Report all NBS outcomes to NIH Baby's First Test and state NICU network.",
+    "reporting_requirements": "Quarterly NBS quality reports to NIH NICHD. Annual RUSP implementation status report. Final report.",
+    "budget_requirements": "Reagents for NBS panel expansion. SMA molecular testing reagents. Staff time for validation. NIH Baby's First Test data submission.",
+    "evaluation_criteria": "RUSP implementation plan (30 points). SMA testing approach (25 points). LSD second-tier plan (25 points). Budget (20 points).",
+    "submission_instructions": "Deadline: August 15, 2022. Submit via NIH grants portal (Grants.gov). Required: Narrative, Budget, CAP accreditation."
+  },
+  "evaluation_scores": {
+    "completeness": 0.71,
+    "parameter_accuracy": 0.82,
+    "compliance": 0.78,
+    "groundedness": 0.22,
+    "coherence": 0.68
+  },
+  "gate_decision": "FAIL",
+  "failure_reasons": [
+    "groundedness: federal_sponsor stated as 'NIH / NICHD' — source RFP specifies 'HRSA / MCHB' (Health Resources and Services Administration / Maternal and Child Health Bureau)",
+    "groundedness: 'NIH Baby's First Test' referenced — actual program is HRSA NewSTEPs (Newborn Screening Technical assistance and Evaluation Program)",
+    "groundedness: submission via 'Grants.gov / NIH grants portal' — source specifies Public Health Labs Grants Portal",
+    "groundedness: NICHD award number format inconsistent with HRSA U-series cooperative agreement used by source RFP",
+    "completeness: reporting_requirements section missing quarterly NBS quality reports detail from source",
+    "coherence: draft mixes NIH research grant framing with state public health laboratory cooperative agreement context inconsistently"
+  ],
+  "evaluator_notes": "Classic federal program confusion — the model substituted NIH/NICHD for HRSA/MCHB. While both agencies fund newborn screening adjacent work, HRSA (through MCHB and the Title V block grant) is the primary funder of state NBS programs, not NIH. This confusion results in a completely wrong submission portal (NIH Grants.gov vs Public Health Labs portal), wrong program office references (NICHD vs MCHB), and fabricated program name (NIH Baby's First Test vs HRSA NewSTEPs). Groundedness evaluator correctly catches this as low-fidelity generation despite reasonable technical content."
+}

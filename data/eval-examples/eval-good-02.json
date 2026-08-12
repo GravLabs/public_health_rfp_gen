@@ -1,0 +1,35 @@
+{
+  "id": "eval-good-02",
+  "label": "PASS — LRN-B Bioterrorism, Accurate Parameters, High Groundedness",
+  "rfp_id": "Public Health Labs-RFP-2024-BIOTERROR-042",
+  "program_area": "Bioterrorism Preparedness",
+  "extracted_parameters": {
+    "total_funding": 4100000,
+    "period_of_performance_months": 24,
+    "cost_sharing_required": false,
+    "federal_sponsor": "CDC / CSELS / OID",
+    "award_range_min": 150000,
+    "award_range_max": 450000,
+    "estimated_awards_min": 12,
+    "estimated_awards_max": 16
+  },
+  "generated_draft": {
+    "background": "The Laboratory Response Network for Biological Threats (LRN-B) has been the backbone of bioterrorism detection in the United States since 1999. Post-COVID personnel turnover has eroded LRN-B Reference Laboratory surge capacity, requiring modernization of threat agent detection, staff requalification, and SOP updates to current 2023 CDC standards. This award funds LRN-B Reference Laboratories to restore full Category A agent detection capability and achieve verified surge capacity of 200 powder specimens per 24-hour period.",
+    "funding_parameters": "Total available funding: $4,100,000. Awards: 12–16. Range per laboratory: $150,000–$450,000. Period of performance: 24 months (April 1, 2024 – March 31, 2026). Federal sponsor: CDC / CSELS / OID. Cost sharing: not required.",
+    "eligibility": "Active CDC-recognized LRN-B Reference Laboratory with CLIA high-complexity certification and all applicable USDA and CDC select agent registration. Documentation of post-COVID capacity gap signed by laboratory director. Passing score on most recent CDC LRN-B proficiency tests within last 24 months.",
+    "scope_of_work": "1. Qualify minimum 4 laboratory scientists across all LRN-B Reference Laboratory assays (B. anthracis, Y. pestis, F. tularensis, orthopoxvirus) within CDC LRN-B qualification standards within 12 months. 2. Replace or validate real-time PCR instruments exceeding 7 years of age. Restock all Category A reagent panels to minimum 200 test equivalents. 3. Demonstrate 200 environmental (powder) specimen processing capacity per 24-hour period with documented ≤2 hour on-call activation. 4. Update all SOPs to 2023 CDC LRN-B methods revision. Implement electronic chain-of-custody documentation for all LRN-B testing.",
+    "reporting_requirements": "Qualification status reports at 6, 12, 18 months. Instrument validation reports within 30 days of replacement. Surge exercise after-action reports within 60 days. CDC LRN-B proficiency test results per CDC protocol. Final report 90 days post-period of performance.",
+    "budget_requirements": "PCR instrumentation replacement allowable with single-source justification for CDC-approved instruments. Category A reagent stockpile replenishment allowable. Biosafety cabinet upgrades allowable if documented. CDC LRN-B training travel allowable. Personnel qualification costs including travel to Atlanta allowable.",
+    "evaluation_criteria": "Post-COVID capacity gap documentation (25 points). Personnel qualification plan (25 points). Surge capacity restoration plan (25 points). SOP and documentation plan (15 points). Budget justification (10 points).",
+    "submission_instructions": "Deadline: February 23, 2024, 5:00 PM Eastern Time. Submit via Public Health Labs Grants Portal (secure, FOUO). Required documents: Narrative (16 pages maximum), Budget, CDC LRN-B recognition letter, select agent registration, laboratory director gap analysis attestation, most recent proficiency test results."
+  },
+  "evaluation_scores": {
+    "completeness": 1.0,
+    "parameter_accuracy": 1.0,
+    "compliance": 0.91,
+    "groundedness": 0.93,
+    "coherence": 0.92
+  },
+  "gate_decision": "PASS",
+  "evaluator_notes": "All 8 sections present with adequate word counts. Funding parameters exactly match RFP: $4.1M total, 24 months, 12-16 awards, $150K-$450K range, no cost sharing. No prohibited patterns detected. Groundedness high — all facts traceable to RFP-2024-BIOTERROR-042 source. Coherence excellent, technical terminology consistent with LRN-B program context."
+}

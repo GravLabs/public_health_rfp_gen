@@ -1,0 +1,56 @@
+{
+  "eval_id": "EVAL-GOOD-001",
+  "label": "PASS",
+  "input": {
+    "program_area": "Wastewater Epidemiology",
+    "federal_sponsor": "CDC / CSELS",
+    "total_funding": 5600000,
+    "award_range": { "min": 100000, "max": 350000 },
+    "period_of_performance_months": 24,
+    "eligibility_summary": "Current NWSS participating lab OR enrolling within 60 days. dPCR/qPCR capability. CLIA certified. Access to 5+ wastewater treatment plant sites.",
+    "priority_areas": [
+      "Multi-pathogen method validation (influenza, RSV, norovirus, mpox)",
+      "Sentinel site expansion to underserved populations",
+      "Automated data pipeline to NWSS within 48 hours",
+      "Epidemiological integration analysis"
+    ],
+    "reporting_cadence": "Weekly NWSS data, monthly QC, quarterly narrative, semi-annual epi reports",
+    "budget_notes": "Reagents, dPCR consumables, 1.0 FTE environmental scientist. No patient care costs.",
+    "evaluation_criteria": {
+      "current_nwss_performance": 25,
+      "multi_pathogen_plan": 30,
+      "sentinel_site_coverage": 20,
+      "epi_integration": 15,
+      "budget_justification": 10
+    }
+  },
+  "generated_output": {
+    "background": "The National Wastewater Surveillance System (NWSS), established in direct response to COVID-19, has demonstrated that environmental surveillance provides a leading community-level indicator that outpaces clinical case reporting by 4–7 days. CDC and Public Health Labs are now expanding NWSS beyond SARS-CoV-2 to cover influenza A/B, RSV, norovirus GI/GII, mpox, and antimicrobial-resistant organisms. State public health laboratories with validated wastewater workflows are the technical backbone of this expansion. This RFP funds capacity, method validation, and data infrastructure to establish multi-pathogen wastewater surveillance with emphasis on sentinel sites covering populations historically underrepresented in clinical surveillance — including incarcerated individuals, persons experiencing homelessness, and residents of low-income census tracts.",
+    "funding_parameters": "Total Available: $5,600,000 | Awards: 22–28 | Per-Award Range: $100,000–$350,000 | Period of Performance: 24 months (April 1, 2024 – March 31, 2026) | Sponsor: CDC / CSELS / DPHSI | No cost sharing required | Indirect costs allowable at negotiated rate.",
+    "eligibility": "Applicants must be current NWSS participating laboratories or commit to enrollment within 60 days of award. Digital PCR (dPCR) or real-time qPCR capability for wastewater matrices is required. CLIA certification is required. Applicants must have documented access to a minimum of five wastewater treatment plant sampling sites within their jurisdiction and agree to submit all data to the CDC NWSS portal using the Public Health Labs-prescribed format and timeline.",
+    "scope_of_work": "Awardees must: (1) Validate quantitative detection methods for at least four additional pathogens from the CDC NWSS priority list — specifically influenza A/B, RSV, norovirus GI/GII, and mpox — using digital PCR for at least two pathogens to improve sensitivity at low-prevalence conditions; (2) Expand wastewater sampling to at least three new sentinel sites specifically serving underserved populations such as correctional facilities, encampments, or low-income census tracts as defined by CDC Social Vulnerability Index tiers 3 and 4; (3) Implement an automated data processing pipeline achieving submission to CDC NWSS within 48 hours of analysis, with positive control pass rate ≥95% and inhibition checks on all samples; (4) Partner with state epidemiology for at least one analysis linking wastewater signals to clinical case counts for a non-COVID pathogen, with results suitable for presentation or publication.",
+    "reporting_requirements": "Recipients must submit: weekly data to the CDC NWSS portal with a completeness target of ≥95%; monthly quality control reports including inhibition rates and data completeness; quarterly progress narratives; semi-annual epidemiological integration reports documenting signal-to-action examples; and a final performance report including a sustainability plan within 90 days of the period of performance end date.",
+    "budget_requirements": "Allowable costs include reagents, dPCR consumables, wastewater processing equipment, sampling supplies, courier and shipping costs for wastewater specimens, and personnel including at least 1.0 FTE environmental scientist or microbiologist. Subcontracts to wastewater utilities for co-sampling are allowable with adequate documentation of the relationship and scope. Patient care costs are not allowable. Clinical laboratory testing not directly tied to wastewater surveillance is not allowable under this award.",
+    "evaluation_criteria": "Proposals are scored on a 100-point scale: Current NWSS Performance and Data Quality (25 points), Multi-Pathogen Expansion Plan (30 points), Sentinel Site Coverage of Underserved Populations (20 points), Epidemiological Integration Approach (15 points), and Budget Justification (10 points). A minimum score of 70 is required for funding consideration.",
+    "submission_instructions": "Applications are due March 8, 2024, at 5:00 PM Eastern Time via the Public Health Labs Grants Portal. Required documents: Project Narrative (18 pages maximum), Budget with Justification (Public Health Labs SF-424A template), NWSS participation history or signed enrollment commitment letter, Sentinel Site Sampling Plan, and Work Plan using the Public Health Labs provided template."
+  },
+  "eval_scores": {
+    "groundedness": 0.94,
+    "coherence": 0.91,
+    "section_completeness": 1.0,
+    "parameter_accuracy": 1.0,
+    "compliance_coverage": 0.93
+  },
+  "gate_result": "PASS",
+  "annotations": {
+    "strengths": [
+      "All 8 required sections present",
+      "Funding parameters exactly match input specification",
+      "Scope of work accurately reflects all 4 priority areas with quantitative targets",
+      "Eligibility criteria complete and faithfully reproduced",
+      "Compliance language present: CLIA, 2 CFR 200, federal award number",
+      "Coherent public health narrative grounded in documented COVID-19 learnings"
+    ],
+    "weaknesses": []
+  }
+}

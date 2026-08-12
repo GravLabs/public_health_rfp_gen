@@ -1,0 +1,35 @@
+{
+  "id": "eval-good-07",
+  "label": "PASS — LIMS Modernization, Accurate Parameters, HL7 FHIR R4 and Compliance Language",
+  "rfp_id": "Public Health Labs-RFP-2024-DATAGOV-043",
+  "program_area": "Laboratory Data Systems — LIMS Modernization",
+  "extracted_parameters": {
+    "total_funding": 5100000,
+    "period_of_performance_months": 36,
+    "cost_sharing_required": false,
+    "federal_sponsor": "CDC / OID / DPHCID",
+    "award_range_min": 100000,
+    "award_range_max": 400000,
+    "estimated_awards_min": 18,
+    "estimated_awards_max": 24
+  },
+  "generated_draft": {
+    "background": "Public health laboratory information management systems (LIMS) are fragmented, aging, and inconsistently interoperable. COVID-19 exposed critical gaps: legacy LIMS could not handle surge volumes, result reporting was manual and delayed, and data quality was insufficient for timely public health decision-making. CDC's Data Modernization Initiative (DMI) and the HL7 FHIR R4 electronic laboratory reporting mandate create a strategic window to modernize state public health laboratory data infrastructure. This 36-month cooperative agreement funds state laboratories to implement or upgrade LIMS, establish formal data governance frameworks, and achieve certified HL7 FHIR R4-compliant ELR for all notifiable conditions. All activities must comply with 2 CFR Part 200 Uniform Guidance.",
+    "funding_parameters": "Total available funding: $5,100,000. Awards: 18–24. Range per laboratory: $100,000–$400,000. Period of performance: 36 months (July 1, 2024 – June 30, 2027). Federal sponsor: CDC / OID / Data Modernization Initiative (DPHCID). Cost sharing: not required.",
+    "eligibility": "Public Health Labs member state public health laboratory with CLIA high-complexity certification. Documented LIMS modernization need: system older than 8 years, manual reporting workflows, or HL7 ELR capability absent for ≥5 notifiable conditions. State health department IT and epidemiology commitment required (letter). Human subjects activities must comply with 45 CFR Part 46.",
+    "scope_of_work": "1. Implement or upgrade LIMS to cloud-capable, multi-platform system covering virology, bacteriology, chemistry, and serology sections. Achieve ≥99.5% monthly uptime with documented disaster recovery plan (≤4 hour RTO). 2. Achieve certified HL7 FHIR R4-compliant ELR for all CDC nationally notifiable conditions within 24 months. Participate in CDC AIMS Platform FHIR onboarding and complete all validation milestones. Priority conditions (influenza, SARS-CoV-2, Salmonella, N. meningitidis) reporting latency ≤24 hours. 3. Implement LIMS-based quality management system: CAPA, document control, instrument maintenance tracking, and proficiency test management. 4. Develop and implement laboratory data governance policy covering data ownership, RBAC with audit trails, data dictionary, and retention schedules. Complete SOC 2 Type I assessment within 24 months.",
+    "reporting_requirements": "LIMS implementation milestone reports at 6, 12, 18, 24 months. ELR certification documentation per CDC AIMS Platform protocol. Data governance policy submission at month 12. Quarterly operations reports: uptime, turnaround, ELR latency. SF-425 Federal Financial Reports per 2 CFR Part 200 schedule. Final report 90 days post-period of performance.",
+    "budget_requirements": "LIMS software licensing (SaaS or perpetual) allowable; on-premise hardware requires justification. HL7/FHIR interface development allowable. SOC 2 assessment allowable. Staff time for LIMS implementation, validation, and governance framework development allowable. Indirect costs at federally negotiated rate only. No supplanting of existing state IT funds.",
+    "evaluation_criteria": "Current LIMS gap documentation (20 points). LIMS modernization plan (25 points). HL7 FHIR R4 ELR implementation plan (25 points). Data governance framework (20 points). Budget justification and 2 CFR 200 compliance narrative (10 points).",
+    "submission_instructions": "Deadline: June 7, 2024, 5:00 PM Eastern Time. Submit via Public Health Labs Grants Portal. Required: Narrative (20 pages), SF-424 Application, Budget Narrative, current LIMS documentation (system age, capabilities), state health department IT support letter, current ELR capability inventory by notifiable condition."
+  },
+  "evaluation_scores": {
+    "completeness": 1.0,
+    "parameter_accuracy": 1.0,
+    "compliance": 0.97,
+    "groundedness": 0.93,
+    "coherence": 0.96
+  },
+  "gate_decision": "PASS",
+  "evaluator_notes": "All 8 sections complete with strong word counts. Parameters exact match including 36-month period of performance. HL7 FHIR R4, AIMS Platform, DMI, SOC 2 Type I, RBAC, and RTO correctly referenced. Compliance language strong: 2 CFR Part 200, 45 CFR Part 46, SF-424, SF-425, no-supplanting — matches PHEP-level compliance expectations. Groundedness high — all technical standards and metrics traceable to source RFP."
+}

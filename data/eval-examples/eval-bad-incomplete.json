@@ -1,0 +1,53 @@
+{
+  "eval_id": "EVAL-BAD-002",
+  "label": "FAIL",
+  "failure_type": "incomplete_sections",
+  "input": {
+    "program_area": "Public Health Emergency Preparedness (PHEP)",
+    "federal_sponsor": "CDC / OPHPR",
+    "total_funding": 4200000,
+    "award_range": { "min": 75000, "max": 350000 },
+    "period_of_performance_months": 12,
+    "eligibility_summary": "Public Health Labs member STLT lab. CLIA certified. Active LRN participation. No unresolved audit findings.",
+    "priority_areas": [
+      "Surge testing capacity",
+      "Information systems modernization (HL7 FHIR ELR)",
+      "Workforce cross-training (80% staff completion)",
+      "Supply chain resilience (90-day stockpile)"
+    ]
+  },
+  "generated_output": {
+    "background": "Public Health Labs is distributing PHEP funding from CDC to strengthen public health laboratory emergency preparedness. This funding addresses gaps identified during COVID-19.",
+    "funding_parameters": "Total: $4.2M. Grants available for eligible labs.",
+    "eligibility": "Must be an public health member laboratory.",
+    "scope_of_work": "Labs should work on surge capacity and training.",
+    "reporting_requirements": null,
+    "budget_requirements": null,
+    "evaluation_criteria": "Applications will be reviewed by Public Health Labs staff.",
+    "submission_instructions": "Contact Public Health Labs for details."
+  },
+  "eval_scores": {
+    "groundedness": 0.61,
+    "coherence": 0.55,
+    "section_completeness": 0.38,
+    "parameter_accuracy": 0.42,
+    "compliance_coverage": 0.10
+  },
+  "gate_result": "FAIL",
+  "failure_reasons": [
+    "CRITICAL: section_completeness=0.38 (threshold: 1.0) — reporting_requirements and budget_requirements are null",
+    "CRITICAL: parameter_accuracy=0.42 — award range not specified, number of awards missing, period of performance not stated",
+    "LOW QUALITY: Background is 2 sentences with no program context, COVID rationale, or priority area justification",
+    "LOW QUALITY: Eligibility missing CLIA requirement, LRN participation, audit finding provision",
+    "LOW QUALITY: Scope of work is 1 vague sentence — 4 priority areas with quantitative targets completely absent",
+    "LOW QUALITY: Evaluation criteria is non-specific — no point breakdown, no minimum score",
+    "LOW QUALITY: Submission instructions give no deadline, portal, or required documents",
+    "MISSING: HL7 FHIR, ELR, Data Modernization Initiative — none of the technical specifics present",
+    "MISSING: 80% workforce training target, 90-day stockpile requirement, mutual aid agreements"
+  ],
+  "annotations": {
+    "root_cause": "Model produced a generic, skeletal output with minimal grounding in the source RFP documents. Likely caused by insufficient retrieval — relevant PHEP historical sections were not retrieved, so the model generated from vague priors.",
+    "detection_method": "section_completeness=0.38 AND parameter_accuracy=0.42 — both below threshold. Gate blocked before human review.",
+    "remediation": "Re-run retrieval with expanded query targeting PHEP eligibility criteria and PHEP scope of work sections specifically. Increase top-k from 5 to 10 for this query type."
+  }
+}

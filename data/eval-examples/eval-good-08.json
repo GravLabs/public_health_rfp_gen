@@ -1,0 +1,35 @@
+{
+  "id": "eval-good-08",
+  "label": "PASS — Emergency Genomic Sequencing Surge, Accurate Parameters, Cloud Bioinformatics",
+  "rfp_id": "Public Health Labs-RFP-2024-GENOMICSURGE-050",
+  "program_area": "Genomic Surveillance — Emergency Surge Capacity",
+  "extracted_parameters": {
+    "total_funding": 5600000,
+    "period_of_performance_months": 36,
+    "cost_sharing_required": false,
+    "federal_sponsor": "CDC / CSELS / OID",
+    "award_range_min": 200000,
+    "award_range_max": 500000,
+    "estimated_awards_min": 14,
+    "estimated_awards_max": 18
+  },
+  "generated_draft": {
+    "background": "COVID-19 established whole genome sequencing (WGS) as a cornerstone of public health emergency response — variant tracking, outbreak investigation, and vaccine effectiveness monitoring all depend on real-time genomic surveillance at scale. Building on the COVID-19 sequencing infrastructure, this 36-month cooperative agreement funds state public health laboratories to establish pathogen-agnostic genomic surge infrastructure achieving high-throughput WGS for any priority pathogen within 72 hours of emergency declaration. Shared sequencing platforms serve all pathogen-specific surveillance programs (influenza, SARS-CoV-2, mpox, foodborne pathogens, AMR, novel emerging threats) through a common infrastructure, maximizing federal investment and cross-program efficiency.",
+    "funding_parameters": "Total available funding: $5,600,000. Awards: 14–18. Range per laboratory: $200,000–$500,000. Period of performance: 36 months (April 1, 2025 – March 31, 2028). Federal sponsor: CDC / CSELS / OID / Advanced Molecular Detection. Cost sharing: not required.",
+    "eligibility": "Public Health Labs member state public health laboratory with existing WGS infrastructure (Illumina MiSeq or higher, or Oxford Nanopore MinION or GridION). CLIA high-complexity certification. Active PulseNet, SPHERES, or equivalent CDC genomic network participant. Minimum 200 genomes submitted to a CDC genomic database in prior 12 months. Dedicated bioinformatician or access to cloud-based analysis pipeline.",
+    "scope_of_work": "1. Achieve minimum 500 genome equivalents/week surge capacity through platform upgrade or instrument addition. Validate Oxford Nanopore rapid sequencing workflow achieving complete pathogen genome within 6 hours of library prep for novel threat scenarios. Maintain 90-day cold-standby reagent stockpile. 2. Develop validated sequencing protocols for MPXV (monkeypox), H5N1 influenza, novel enterovirus, and novel pathogen using tiled amplicon approach. Implement adaptive sequencing decision tree enabling new pathogen protocol within 14 days of receiving CDC assay design materials. 3. Migrate all bioinformatic pipelines to cloud infrastructure (AWS GovCloud, Azure Government, or STRIDES-compliant) with elasticity for 10× routine volume. Implement automated raw-reads-to-submission pipelines for SARS-CoV-2, influenza, Salmonella, Listeria, and STEC. 4. Develop written Emergency Genomic Surge Activation Protocol. Commit to Public Health Labs regional mutual aid agreement to accept overflow specimens from ≥2 neighboring state laboratories. Conduct annual full-scale 5-day genomic surge exercise.",
+    "reporting_requirements": "Quarterly genomic output reports by pathogen, turnaround time, and database submission rates. Platform expansion milestone reports at 6 and 12 months. Annual surge exercise after-action reports. Mutual aid utilization reports as events occur. Final report 90 days post-period of performance.",
+    "budget_requirements": "Sequencing instruments (Illumina NextSeq, Oxford Nanopore GridION/PromethION) allowable if capacity gap documented. Cloud compute and storage (SaaS/PaaS) allowable up to 36-month period. 90-day reagent surge stockpile allowable. Bioinformatician FTE (0.5–1.0) allowable. Mutual aid specimen transport allowable. No capital equipment >$100,000 without Public Health Labs prior approval.",
+    "evaluation_criteria": "Current WGS output and network participation (20 points). Surge capacity expansion plan (25 points). Pathogen-agnostic protocol development (25 points). Cloud bioinformatics infrastructure (20 points). Budget justification (10 points).",
+    "submission_instructions": "Deadline: January 16, 2025, 5:00 PM Eastern Time. Submit via Public Health Labs Grants Portal. Required: Narrative (20 pages), Budget, 12-month WGS submission history from CDC genomic database, current platform documentation, bioinformatician qualifications, mutual aid intent letter from ≥1 neighboring state."
+  },
+  "evaluation_scores": {
+    "completeness": 1.0,
+    "parameter_accuracy": 1.0,
+    "compliance": 0.90,
+    "groundedness": 0.95,
+    "coherence": 0.97
+  },
+  "gate_decision": "PASS",
+  "evaluator_notes": "All 8 sections complete. Parameters exact match including 36-month period of performance and $5.6M. SPHERES, AMD, STRIDES, PulseNet network references accurate. Nanopore 6-hour assembly target correctly specified. Mutual aid commitment and surge exercise requirements captured. Cloud infrastructure options (AWS GovCloud, Azure Government, STRIDES) correctly referenced. Very high groundedness — all technical details traceable to source RFP. Best-in-class example for complex multi-program infrastructure RFP."
+}

@@ -1,0 +1,46 @@
+{
+  "id": "eval-bad-wrongparams",
+  "label": "FAIL — Parameter Accuracy Failure: Wrong Funding Total and Award Count",
+  "rfp_id": "Public Health Labs-RFP-2023-SEPSIS-039",
+  "program_area": "Healthcare Safety — Sepsis Rapid Diagnostics",
+  "extracted_parameters": {
+    "total_funding": 5000000,
+    "period_of_performance_months": 36,
+    "cost_sharing_required": true,
+    "federal_sponsor": "CDC / NCEZID / DHCPP",
+    "award_range_min": 200000,
+    "award_range_max": 500000,
+    "estimated_awards_min": 8,
+    "estimated_awards_max": 12
+  },
+  "generated_draft": {
+    "background": "Sepsis affects millions of Americans annually. State public health laboratories can partner with acute care hospitals to implement rapid diagnostic technologies that identify pathogens faster, enabling targeted antibiotic therapy and supporting antimicrobial stewardship programs. This 36-month program funds state laboratories to modernize sepsis diagnostics through MALDI-TOF and multiplex blood culture identification panels.",
+    "funding_parameters": "Total available funding: $5,000,000. Awards: 8–12. Range per laboratory: $200,000–$500,000. Period of performance: 36 months. Federal sponsor: CDC / NCEZID. Cost sharing: required at 10% of award.",
+    "eligibility": "State laboratory with CLIA high-complexity certification and bacteriology capability. Partnership with acute care hospital. EIP participation.",
+    "scope_of_work": "Implement MALDI-TOF for blood culture isolates. Implement multiplex syndromic panel (BioFire BCID2). Establish sepsis pathogen surveillance across hospital partners. Support antimicrobial stewardship programs.",
+    "reporting_requirements": "Quarterly reports to CDC. Outbreak investigation reports. Final report.",
+    "budget_requirements": "MALDI-TOF consumables. Hospital coordination. Cost sharing of 10% required from applicant institution.",
+    "evaluation_criteria": "Technical approach (50 points). Hospital network (25 points). Budget (25 points).",
+    "submission_instructions": "Deadline: June 9, 2023. Submit via Public Health Labs portal. Required: Narrative, Budget."
+  },
+  "evaluation_scores": {
+    "completeness": 0.62,
+    "parameter_accuracy": 0.0,
+    "compliance": 0.75,
+    "groundedness": 0.58,
+    "coherence": 0.71
+  },
+  "gate_decision": "FAIL",
+  "failure_reasons": [
+    "parameter_accuracy: total_funding $5,000,000 vs expected $3,100,000 (delta 61.3%, exceeds 5% tolerance)",
+    "parameter_accuracy: period_of_performance_months 36 vs expected 24",
+    "parameter_accuracy: cost_sharing_required TRUE vs expected FALSE",
+    "parameter_accuracy: award_range_min $200,000 vs expected $100,000",
+    "parameter_accuracy: award_range_max $500,000 vs expected $350,000",
+    "parameter_accuracy: estimated_awards 8-12 vs expected 12-16",
+    "completeness: evaluation_criteria section generic (50/25/25 vs 5 specific criteria), insufficient detail",
+    "completeness: submission_instructions missing required documents list",
+    "groundedness: total_funding and award count not grounded in source document"
+  ],
+  "evaluator_notes": "Catastrophic parameter extraction failure. The model hallucinated a larger total budget ($5M vs $3.1M), extended the period of performance by 12 months, invented a cost sharing requirement that does not exist in the source RFP, and compressed the award count. The draft is also shallow — evaluation criteria collapsed to generic categories, submission instructions stripped of required documents. Groundedness penalized because the funding narrative does not match retrievable source facts. This example tests the parameter_accuracy evaluator's ability to flag multiple simultaneous parameter errors."
+}

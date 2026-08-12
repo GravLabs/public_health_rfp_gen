@@ -1,0 +1,90 @@
+$schema: https://azuremlschemas.azureedge.net/promptflow/latest/Flow.schema.json
+name: pubhealth-rfp-generation
+description: >
+  End-to-end RFP generation flow for APHL member laboratories.
+  Classifies program area, retrieves grounding context from AI Search,
+  generates all 8 RFP sections, then evaluates quality across 5 dimensions.
+
+inputs:
+  program_area:
+    type: string
+    description: CDC program area (e.g. "Influenza Surveillance", "WGS Genomics")
+  description:
+    type: string
+    description: Free-text description of the cooperative agreement purpose
+  params:
+    type: object
+    description: Structured funding parameters (total_funding, period_months, etc.)
+    default: {}
+
+outputs:
+  draft:
+    type: object
+    reference: ${generate_node.output.draft}
+  gate_scores:
+    type: object
+    reference: ${evaluate_node.output.gate_scores}
+  passed:
+    type: bool
+    reference: ${evaluate_node.output.passed}
+
+nodes:
+  - name: classify_node
+    type: llm
+    source:
+      type: code
+      path: classify_node.jinja2
+    inputs:
+      deployment_name: gpt-4o
+      temperature: 0
+      max_tokens: 64
+      description: ${inputs.description}
+      program_area_hint: ${inputs.program_area}
+    connection: azure_openai_connection
+    api: chat
+    outputs:
+      classified_area:
+        type: string
+
+  - name: search_node
+    type: python
+    source:
+      type: code
+      path: search_node.py
+    inputs:
+      program_area: ${classify_node.output.classified_area}
+      description: ${inputs.description}
+      top_k: 8
+    outputs:
+      chunks:
+        type: list
+
+  - name: generate_node
+    type: python
+    source:
+      type: code
+      path: generate_node.py
+    inputs:
+      deployment_name: gpt-4o-finetuned
+      program_area: ${classify_node.output.classified_area}
+      description: ${inputs.description}
+      params: ${inputs.params}
+      chunks: ${search_node.output.chunks}
+    outputs:
+      draft:
+        type: object
+
+  - name: evaluate_node
+    type: python
+    source:
+      type: code
+      path: evaluate_node.py
+    inputs:
+      draft: ${generate_node.output.draft}
+      params: ${inputs.params}
+      chunks: ${search_node.output.chunks}
+    outputs:
+      gate_scores:
+        type: object
+      passed:
+        type: bool

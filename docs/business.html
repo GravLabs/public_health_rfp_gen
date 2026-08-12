@@ -1,0 +1,636 @@
+<title>RFP Generator Overview</title>
+<style>
+  :root {
+    --ground:     #F4F6FB;
+    --surface:    #FFFFFF;
+    --surface-2:  #EBF0FA;
+    --border:     #D0DAF0;
+    --text-1:     #111827;
+    --text-2:     #374151;
+    --text-3:     #6B7280;
+    --accent:     #1D4ED8;
+    --accent-soft:#DBEAFE;
+    --green:      #059669;
+    --green-soft: #D1FAE5;
+    --amber:      #B45309;
+    --amber-soft: #FEF3C7;
+    --red:        #B91C1C;
+    --red-soft:   #FEE2E2;
+    --radius:     8px;
+    --shadow:     0 1px 6px rgba(17,24,39,.08);
+    --shadow-md:  0 4px 16px rgba(17,24,39,.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:     #0F172A;
+      --surface:    #1E293B;
+      --surface-2:  #263348;
+      --border:     #334155;
+      --text-1:     #F1F5F9;
+      --text-2:     #94A3B8;
+      --text-3:     #64748B;
+      --accent:     #60A5FA;
+      --accent-soft:#1E3A5F;
+      --green:      #34D399;
+      --green-soft: #064E3B;
+      --amber:      #FCD34D;
+      --amber-soft: #451A03;
+      --red:        #F87171;
+      --red-soft:   #450A0A;
+      --shadow:     0 1px 6px rgba(0,0,0,.4);
+      --shadow-md:  0 4px 16px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:     #0F172A;
+    --surface:    #1E293B;
+    --surface-2:  #263348;
+    --border:     #334155;
+    --text-1:     #F1F5F9;
+    --text-2:     #94A3B8;
+    --text-3:     #64748B;
+    --accent:     #60A5FA;
+    --accent-soft:#1E3A5F;
+    --green:      #34D399;
+    --green-soft: #064E3B;
+    --amber:      #FCD34D;
+    --amber-soft: #451A03;
+    --red:        #F87171;
+    --red-soft:   #450A0A;
+    --shadow:     0 1px 6px rgba(0,0,0,.4);
+    --shadow-md:  0 4px 16px rgba(0,0,0,.5);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    background: var(--ground);
+    color: var(--text-1);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.75;
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  /* ── Page wrapper ─────────────────────────────────────────────────────────── */
+  .page { max-width: 860px; margin: 0 auto; padding: 56px 32px 96px; }
+
+  /* ── Typography ───────────────────────────────────────────────────────────── */
+  h1, h2, h3 {
+    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+    text-wrap: balance;
+    color: var(--text-1);
+    line-height: 1.2;
+  }
+  h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -.03em; }
+  h2 { font-size: 1.6rem; font-weight: 700; letter-spacing: -.02em; margin-top: 64px; margin-bottom: 20px; }
+  h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+  p  { color: var(--text-2); margin-bottom: 16px; max-width: 66ch; }
+  p.wide { max-width: none; }
+  strong { color: var(--text-1); font-weight: 600; }
+  ul { padding-left: 1.4em; margin-bottom: 16px; }
+  li { margin-bottom: 6px; color: var(--text-2); }
+
+  /* ── Hero ─────────────────────────────────────────────────────────────────── */
+  .hero {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .hero .eyebrow {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 14px;
+    display: block;
+  }
+  .hero h1 { margin-bottom: 18px; }
+  .hero .lead {
+    font-size: 1.2rem;
+    color: var(--text-2);
+    max-width: 58ch;
+    line-height: 1.6;
+    margin-bottom: 0;
+  }
+
+  /* ── Stat row ─────────────────────────────────────────────────────────────── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 40px 0;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 20px;
+    box-shadow: var(--shadow);
+  }
+  .stat-card .stat-val {
+    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-card .stat-label { font-size: .88rem; color: var(--text-3); }
+
+  /* ── Problem / solution ───────────────────────────────────────────────────── */
+  .vs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .vs-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    box-shadow: var(--shadow);
+  }
+  .vs-card .vs-label {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .10em;
+    margin-bottom: 14px;
+    display: block;
+  }
+  .vs-card.before .vs-label { color: var(--red); }
+  .vs-card.after  .vs-label { color: var(--green); }
+  .vs-card.before { border-top: 3px solid var(--red); }
+  .vs-card.after  { border-top: 3px solid var(--green); }
+  .vs-card ul { margin: 0; padding-left: 1.2em; }
+  .vs-card li { font-size: .92rem; margin-bottom: 8px; color: var(--text-2); }
+
+  /* ── Capability cards ─────────────────────────────────────────────────────── */
+  .cap-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin: 24px 0;
+  }
+  .cap-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cap-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+  .cap-card h3 { font-size: 1rem; margin-bottom: 0; }
+  .cap-card p  { font-size: .88rem; color: var(--text-3); margin: 0; max-width: none; }
+
+  /* ── Persona cards ────────────────────────────────────────────────────────── */
+  .persona-list { display: flex; flex-direction: column; gap: 14px; margin: 24px 0; }
+  .persona-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    box-shadow: var(--shadow);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .persona-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .persona-card h3 { font-size: .95rem; margin-bottom: 2px; }
+  .persona-card .persona-role { font-size: .78rem; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  .persona-card p  { font-size: .88rem; color: var(--text-2); margin: 0; max-width: none; }
+
+  /* ── Workflow steps ───────────────────────────────────────────────────────── */
+  .steps { display: flex; flex-direction: column; gap: 0; margin: 24px 0; }
+  .step {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 16px;
+    align-items: start;
+    position: relative;
+  }
+  .step:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 44px;
+    bottom: -4px;
+    width: 2px;
+    background: var(--border);
+  }
+  .step-num {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .85rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .step-body { padding-bottom: 24px; }
+  .step-body h3 { font-size: .95rem; margin-bottom: 4px; }
+  .step-body p  { font-size: .88rem; color: var(--text-2); margin: 0; max-width: none; }
+
+  /* ── Chat mockup ──────────────────────────────────────────────────────────── */
+  .chat-frame {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    margin: 24px 0;
+  }
+  .chat-header {
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 18px;
+    font-size: .83rem;
+    font-weight: 600;
+    color: var(--text-2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chat-header::before {
+    content: '';
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+  }
+  .chat-body { padding: 20px 18px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { display: flex; gap: 10px; align-items: flex-start; }
+  .msg.user { flex-direction: row-reverse; }
+  .msg-bubble {
+    max-width: 72%;
+    border-radius: 16px;
+    padding: 10px 14px;
+    font-size: .86rem;
+    line-height: 1.5;
+  }
+  .msg.user .msg-bubble {
+    background: var(--accent);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.bot .msg-bubble {
+    background: var(--surface-2);
+    color: var(--text-1);
+    border-bottom-left-radius: 4px;
+  }
+  .msg-avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: .8rem;
+    flex-shrink: 0;
+  }
+  .score-row {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;
+  }
+  .score-chip {
+    font-size: .75rem; font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--green-soft);
+    color: var(--green);
+    border: 1px solid var(--green);
+  }
+
+  /* ── Cost table ───────────────────────────────────────────────────────────── */
+  .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); margin: 20px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  thead th {
+    background: var(--surface-2); color: var(--text-3);
+    font-size: .75rem; text-transform: uppercase; letter-spacing: .08em;
+    font-weight: 600; padding: 10px 16px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 10px 16px; vertical-align: top; }
+  tbody tr:hover { background: var(--surface-2); }
+  .cost-total td { font-weight: 700; border-top: 2px solid var(--border) !important; }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+
+  /* ── Callout ──────────────────────────────────────────────────────────────── */
+  .callout {
+    border-radius: var(--radius); padding: 14px 18px;
+    margin: 16px 0; font-size: .9rem;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .callout.info { background: var(--accent-soft); border-left: 3px solid var(--accent); }
+  .callout.green { background: var(--green-soft); border-left: 3px solid var(--green); }
+  .callout.amber { background: var(--amber-soft); border-left: 3px solid var(--amber); }
+
+  /* ── Responsive ───────────────────────────────────────────────────────────── */
+  @media (max-width: 640px) {
+    .stat-row  { grid-template-columns: 1fr 1fr; }
+    .vs-grid   { grid-template-columns: 1fr; }
+    .cap-grid  { grid-template-columns: 1fr; }
+    .page      { padding: 32px 16px 72px; }
+  }
+</style>
+
+<div class="page">
+
+  <!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+  <div class="hero">
+    <span class="eyebrow">Open-Source Accelerator · Public Health</span>
+    <h1>RFP Generation Platform</h1>
+    <p class="lead">An AI-powered platform that helps public health agencies draft, evaluate, and govern federal grant RFPs in hours instead of weeks — grounded in historical awards, compliant by design, and surfaced directly in Microsoft Teams.</p>
+  </div>
+
+  <!-- ── Stats ─────────────────────────────────────────────────────────────── -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-val">4–8 wk</div>
+      <div class="stat-label">Typical manual RFP cycle time</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">&lt; 1 hr</div>
+      <div class="stat-label">Automated first draft to gate decision</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">5</div>
+      <div class="stat-label">Independent evaluators before any draft reaches reviewers</div>
+    </div>
+  </div>
+
+  <!-- ── The Problem ────────────────────────────────────────────────────────── -->
+  <h2>The Problem</h2>
+  <p>Public health agencies that administer federal grant programs — CDC cooperative agreements, HRSA awards, HHS emergency preparedness funds — issue dozens of RFPs per year. Today the process is almost entirely manual.</p>
+
+  <div class="vs-grid">
+    <div class="vs-card before">
+      <span class="vs-label">Today — Manual Process</span>
+      <ul>
+        <li>Program officer drafts from memory and prior-year documents</li>
+        <li>Legal reviews for compliance language — days of back-and-forth</li>
+        <li>Finance reconciles funding parameters separately</li>
+        <li>4–8 weeks per RFP cycle; bottleneck is human bandwidth</li>
+        <li>Inconsistent across program areas and reviewers</li>
+        <li>Regulatory changes often missed until post-publication</li>
+      </ul>
+    </div>
+    <div class="vs-card after">
+      <span class="vs-label">With This Platform</span>
+      <ul>
+        <li>Program officer describes the RFP in plain language in Teams</li>
+        <li>AI drafts all 8 sections, grounded in historical award corpus</li>
+        <li>5-dimension evaluation gate checks compliance automatically</li>
+        <li>First draft ready in under an hour; human review on a clean document</li>
+        <li>Consistent structure and citation format across all program areas</li>
+        <li>Nightly regulatory watch flags changes before they become problems</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── Capabilities ───────────────────────────────────────────────────────── -->
+  <h2>What It Does</h2>
+  <p class="wide">Six AI-powered capabilities, all accessible from Microsoft Teams without leaving the tools your team already uses.</p>
+
+  <div class="cap-grid">
+    <div class="cap-card">
+      <div class="cap-icon">📄</div>
+      <h3>RFP Drafting</h3>
+      <p>Generates all eight required RFP sections — background, funding parameters, eligibility, scope of work, reporting, budget, evaluation criteria, and submission instructions — grounded in historical award precedents.</p>
+    </div>
+    <div class="cap-card">
+      <div class="cap-icon">✅</div>
+      <h3>Quality Gate</h3>
+      <p>Five independent evaluators check completeness, parameter accuracy, compliance citations, groundedness, and coherence before any draft surfaces to a human reviewer. Failures are explained, not just flagged.</p>
+    </div>
+    <div class="cap-card">
+      <div class="cap-icon">📋</div>
+      <h3>Proposal Review</h3>
+      <p>After an RFP closes, reviewers submit incoming proposals for scoring against the RFP's own evaluation criteria. Returns a structured score per criterion with evidence excerpts and a fund / do-not-fund recommendation.</p>
+    </div>
+    <div class="cap-card">
+      <div class="cap-icon">🔍</div>
+      <h3>Program Classification</h3>
+      <p>Automatically maps a free-text funding request description to the correct program area before drafting begins — reducing off-topic drafts and retrieval errors for program officers unfamiliar with taxonomy.</p>
+    </div>
+    <div class="cap-card">
+      <div class="cap-icon">⚖️</div>
+      <h3>Regulatory Watch</h3>
+      <p>Monitors the Federal Register and CDC guidance channels nightly. When new regulations affect grant compliance requirements, the system identifies which existing RFPs in the corpus need to be updated.</p>
+    </div>
+    <div class="cap-card">
+      <div class="cap-icon">💰</div>
+      <h3>Budget Audit</h3>
+      <p>Reviews submitted budget narratives against the originating RFP's funding parameters — flagging discrepancies in total award, performance period, or cost-sharing requirements before the review panel convenes.</p>
+    </div>
+  </div>
+
+  <!-- ── Who Uses It ─────────────────────────────────────────────────────────── -->
+  <h2>Who Uses It</h2>
+  <div class="persona-list">
+    <div class="persona-card">
+      <div class="persona-avatar">👩‍💼</div>
+      <div>
+        <div class="persona-role">Program Officer</div>
+        <h3>Starts the draft</h3>
+        <p>Describes the RFP in plain language in Teams — program area, funding amount, performance period, key requirements. Reviews the AI-generated draft and approves or requests revisions. No forms, no templates, no portal to log into.</p>
+      </div>
+    </div>
+    <div class="persona-card">
+      <div class="persona-avatar">🗂️</div>
+      <div>
+        <div class="persona-role">Grants Administrator</div>
+        <h3>Oversees quality and compliance</h3>
+        <p>Receives drafts that have already passed the automated quality gate. Reviews evaluator scores and failure reasons when a draft is rejected. Uses the proposal review capability during the awards process to score submissions consistently.</p>
+      </div>
+    </div>
+    <div class="persona-card">
+      <div class="persona-avatar">⚖️</div>
+      <div>
+        <div class="persona-role">Compliance Officer</div>
+        <h3>Monitors regulatory exposure</h3>
+        <p>Receives the weekly regulatory watch digest in Teams. Reviews changes flagged against the corpus and approves updates to compliance thresholds. Audits budget narratives before review panels to catch parameter conflicts early.</p>
+      </div>
+    </div>
+    <div class="persona-card">
+      <div class="persona-avatar">🛠️</div>
+      <div>
+        <div class="persona-role">IT / Data Engineer</div>
+        <h3>Deploys and operates the stack</h3>
+        <p>Provisions all Azure resources with a single <code>azd up</code> command (~15 minutes). Manages the SharePoint corpus libraries and OneLake ingestion pipeline. Monitors cost and token usage via the built-in budget dashboard.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── How It Works ───────────────────────────────────────────────────────── -->
+  <h2>How a Program Officer Uses It</h2>
+  <p>The entire workflow happens in Microsoft Teams. No training, no separate application, no context switching.</p>
+
+  <div class="chat-frame">
+    <div class="chat-header">Teams — RFP Generator Bot</div>
+    <div class="chat-body">
+      <div class="msg user">
+        <div class="msg-bubble">Draft a 24-month influenza surveillance RFP. CDC funding, $2.5M total, awards between $150K–$400K, no cost share required.</div>
+        <div class="msg-avatar">👩‍💼</div>
+      </div>
+
+      <!-- Live progress card — updates in-place as each section completes -->
+      <div class="msg bot">
+        <div class="msg-avatar">🤖</div>
+        <div class="msg-bubble" style="min-width:260px">
+          <div style="font-weight:600;margin-bottom:4px">Generating RFP Draft</div>
+          <div style="font-size:.8rem;opacity:.65;margin-bottom:8px">Influenza Surveillance · $2,500,000 · 24 months</div>
+          <div style="font-size:.78rem;color:var(--accent, #3B82F6);margin-bottom:8px">5 of 8 sections complete</div>
+          <div style="font-size:.8rem;display:flex;flex-direction:column;gap:3px">
+            <span>✓ <span style="color:var(--green,#059669)">Background and Purpose</span></span>
+            <span>✓ <span style="color:var(--green,#059669)">Funding Parameters</span></span>
+            <span>✓ <span style="color:var(--green,#059669)">Eligibility Criteria</span></span>
+            <span>✓ <span style="color:var(--green,#059669)">Scope of Work</span></span>
+            <span>✓ <span style="color:var(--green,#059669)">Reporting Requirements</span></span>
+            <span>⏳ <span style="color:var(--accent,#3B82F6)">Budget Requirements</span></span>
+            <span style="opacity:.45">○ Evaluation Criteria</span>
+            <span style="opacity:.45">○ Submission Instructions</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Final result card after gate passes -->
+      <div class="msg bot">
+        <div class="msg-avatar">🤖</div>
+        <div class="msg-bubble" style="min-width:260px">
+          <div style="font-weight:700;color:var(--green,#059669);margin-bottom:4px">✓ Draft Ready — Gate Passed</div>
+          <div style="font-size:.78rem;opacity:.65;margin-bottom:10px">Influenza Surveillance · $2,500,000 · 24 months</div>
+          <div style="font-size:.78rem;margin-bottom:8px;font-weight:600">Evaluation Scores</div>
+          <div style="font-size:.78rem;display:flex;flex-direction:column;gap:3px;margin-bottom:10px">
+            <span style="display:flex;justify-content:space-between"><span>Completeness</span><span style="color:var(--green,#059669)">0.91</span></span>
+            <span style="display:flex;justify-content:space-between"><span>Parameter Accuracy</span><span style="color:var(--green,#059669)">1.00</span></span>
+            <span style="display:flex;justify-content:space-between"><span>Compliance</span><span style="color:var(--green,#059669)">0.88</span></span>
+            <span style="display:flex;justify-content:space-between"><span>Groundedness</span><span style="color:var(--green,#059669)">0.94</span></span>
+            <span style="display:flex;justify-content:space-between"><span>Coherence</span><span style="color:var(--green,#059669)">0.87</span></span>
+          </div>
+          <a href="#" style="display:inline-block;background:var(--accent,#3B82F6);color:white;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:.78rem;font-weight:600">Open Word Draft in SharePoint</a>
+        </div>
+      </div>
+      <div class="msg user">
+        <div class="msg-bubble">Review this proposal against RFP-2024-FLU-027 [proposal.pdf]</div>
+        <div class="msg-avatar">👩‍💼</div>
+      </div>
+      <div class="msg bot">
+        <div class="msg-avatar">🤖</div>
+        <div class="msg-bubble">
+          Reviewed <strong>proposal.pdf</strong> against RFP-2024-FLU-027 evaluation criteria.<br><br>
+          Technical Approach: 8.5/10 · Organizational Capacity: 7.0/10 · Budget Justification: 6.5/10<br><br>
+          <strong>Recommendation: Fund with conditions.</strong> Budget narrative does not itemize indirect cost rate. See section 3.2 for details.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h3>Describe the RFP in Teams</h3>
+        <p>Program officer types the program area, funding amount, period, sponsor, and any special requirements in plain language. The bot classifies the request and confirms parameters before generating.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h3>Watch sections appear live in the chat</h3>
+        <p>The Teams card updates in real time as each of the 8 sections completes — Background, Funding Parameters, Eligibility, and so on — with a checkmark as each one finishes. Program officers see genuine progress rather than a spinner. After all sections complete, the 5-dimension evaluation gate runs automatically. The whole process takes 2–5 minutes.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h3>Open the Word document directly in SharePoint</h3>
+        <p>Gate-passing drafts are saved as Word (.docx) files in the SharePoint Generated Drafts library. The Teams card shows an "Open Word Draft in SharePoint" button. Program officers and compliance reviewers open the document in the browser, make tracked changes, and approve through the standard SharePoint workflow — no file download required.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h3>Analytics and oversight in Power BI</h3>
+        <p>Evaluation scores, pass rates by program area, gate calibration metrics, and regulatory change alerts are all visible in a Power BI dashboard connected to the platform's data store — no additional reporting setup required.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Cost ───────────────────────────────────────────────────────────────── -->
+  <h2>Cost</h2>
+  <p>Two scenarios: <strong>POC</strong> uses free and trial tiers to minimize spend while validating the platform. <strong>Production</strong> removes all free tiers and upgrades to SKUs with SLAs appropriate for operational workloads.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th class="num">POC Monthly</th>
+          <th class="num">Production Monthly</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>AI model costs — generation (GPT-4o fine-tuned)</td><td class="num">$80–140</td><td class="num">$220–370</td></tr>
+        <tr><td>AI model costs — evaluation gate (GPT-4o-mini + o3-mini)</td><td class="num">$8–18</td><td class="num">$22–50</td></tr>
+        <tr><td>Search and retrieval (Azure AI Search)</td><td class="num">$75</td><td class="num">$250</td></tr>
+        <tr><td>API Gateway (Azure API Management)</td><td class="num">$0–5</td><td class="num">$49</td></tr>
+        <tr><td>Application hosting (Container Apps)</td><td class="num">$20–40</td><td class="num">$40–120</td></tr>
+        <tr><td>Analytics (Microsoft Fabric)</td><td class="num">$0 trial</td><td class="num">$400–530</td></tr>
+        <tr><td>Monitoring and storage</td><td class="num">$15–25</td><td class="num">$40–105</td></tr>
+        <tr><td>Teams Bot (Azure Bot Service)</td><td class="num">$0</td><td class="num">$10–30</td></tr>
+        <tr class="cost-total"><td><strong>Total</strong></td><td class="num"><strong>$203–318</strong></td><td class="num"><strong>$1,041–2,254</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout amber">
+    <div><strong>Fabric is the largest production cost.</strong> The 60-day free trial covers the POC period. After the trial, the minimum Fabric capacity (F2) runs ~$400–530/month. If Power BI analytics aren't required immediately, this cost can be deferred by using standard Azure data services for the first production phase.</div>
+  </div>
+  <div class="callout green">
+    <div><strong>Three cost levers reduce model spend by ~50% overall.</strong> (1) <strong>Model routing</strong>: the evaluation gate runs on GPT-4o-mini (~93% cheaper than GPT-4o) — structured scoring tasks don't need the full model. (2) <strong>Section-tiered generation</strong>: 3 of 8 RFP sections (reporting requirements, budget requirements, submission instructions) are boilerplate and generated on GPT-4o-mini; the remaining 5 creative/grounded sections use the fine-tuned GPT-4o. (3) <strong>Prompt caching</strong>: all 8 section calls share the same system message prefix (parameters + grounding context); Azure OpenAI caches it after section 1, cutting prompt token cost ~50% for sections 2–8.</div>
+  </div>
+  <div class="callout green">
+    <div><strong>POC budget headroom.</strong> At $203–318/month against a $500 ceiling, the POC phase leaves $182–297 of room — enough to accommodate higher-than-expected generation volume or add 2–3 Teams users during pilot testing.</div>
+  </div>
+
+  <!-- ── Adapting for your organization ─────────────────────────────────────── -->
+  <h2>Adapting for Your Organization</h2>
+  <p class="wide">This platform is generic by design. The corpus, compliance rules, program taxonomy, and evaluator thresholds are all configurable without changing the underlying platform.</p>
+  <ul>
+    <li><strong>Replace the corpus</strong> — swap the 50 sample RFPs with your organization's actual historical award documents in any format (PDF, Word, Markdown)</li>
+    <li><strong>Add compliance rules</strong> — extend the compliance evaluator with organization-specific required phrases or prohibited terms</li>
+    <li><strong>Change program areas</strong> — update the taxonomy to match your grant program structure; the classification agent adapts automatically</li>
+    <li><strong>Tune thresholds</strong> — each of the 5 evaluators has an independent pass threshold that can be adjusted based on your quality standards</li>
+    <li><strong>Add evaluators</strong> — the gate is extensible; add readability, format compliance, or budget narrative evaluators without changing the core pipeline</li>
+  </ul>
+
+</div>

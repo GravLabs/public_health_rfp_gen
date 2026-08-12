@@ -1,0 +1,43 @@
+{
+  "id": "eval-bad-scopecreep",
+  "label": "FAIL — Compliance Failure: Out-of-Scope Activities and Prohibited Commercial Language",
+  "rfp_id": "Public Health Labs-RFP-2023-LEGIONELLA-021",
+  "program_area": "Environmental Surveillance — Legionella",
+  "extracted_parameters": {
+    "total_funding": 1900000,
+    "period_of_performance_months": 24,
+    "cost_sharing_required": false,
+    "federal_sponsor": "CDC / NCEZID / WDPB",
+    "award_range_min": 75000,
+    "award_range_max": 175000,
+    "estimated_awards_min": 12,
+    "estimated_awards_max": 18
+  },
+  "generated_draft": {
+    "background": "Legionella pneumophila is the causative agent of Legionnaires' disease, a severe form of pneumonia with case fatality rates of 5–10% in community settings and up to 25% in healthcare settings. State public health laboratories can perform culture and sequence-based typing (SBT) to link clinical and environmental Legionella isolates, supporting outbreak investigations. This award funds Legionella culture, SBT, and WGS capability at state laboratories and authorizes expanded commercial water testing services to generate revenue supporting long-term program sustainability.",
+    "funding_parameters": "Total available funding: $1,900,000. Awards: 12–18. Range per laboratory: $75,000–$175,000. Period of performance: 24 months. Federal sponsor: CDC / NCEZID / WDPB. Cost sharing: not required.",
+    "eligibility": "State laboratory with NELAP accreditation for environmental water testing. CLIA high-complexity certification. Existing culture capability for Legionella.",
+    "scope_of_work": "1. Implement Legionella culture from clinical (BAL, sputum) and environmental (cooling tower, potable water) specimens per BCYE agar protocol. 2. Implement sequence-based typing (SBT) for 7 Legionella loci per EWGLI-SBT protocol. 3. Offer Legionella testing services to commercial clients including hotels, hospitals, and cooling tower operators for a fee, with revenue returned to the public health laboratory to sustain the program beyond the grant period. 4. Partner with state and local health departments for outbreak investigation support. 5. Submit Legionella sequences to CDC and international SBT database.",
+    "reporting_requirements": "Quarterly clinical and environmental case reports. SBT database submissions. Commercial client testing volume reports. Final report.",
+    "budget_requirements": "BCYE culture media, SBT reagents allowable. Revenue from commercial testing to offset costs. Equipment shared between public health and commercial testing functions.",
+    "evaluation_criteria": "Legionella culture capability (25 points). SBT implementation (25 points). Commercial revenue model sustainability (25 points). Budget (25 points).",
+    "submission_instructions": "Deadline: May 5, 2023. Submit via Public Health Labs Grants Portal. Required: Narrative, Budget, commercial testing fee schedule."
+  },
+  "evaluation_scores": {
+    "completeness": 0.74,
+    "parameter_accuracy": 0.94,
+    "compliance": 0.15,
+    "groundedness": 0.62,
+    "coherence": 0.71
+  },
+  "gate_decision": "FAIL",
+  "failure_reasons": [
+    "compliance: PROHIBITED PATTERN DETECTED — 'commercial use' — draft explicitly proposes offering 'Legionella testing services to commercial clients... for a fee'",
+    "compliance: PROHIBITED PATTERN DETECTED — 'commercial clients' and 'commercial revenue model' — federal cooperative agreement funds cannot support commercial testing enterprises",
+    "compliance: 'revenue returned to support the program' implies supplanting and unauthorized program income treatment inconsistent with 2 CFR Part 200.307",
+    "compliance: evaluation criterion 'Commercial revenue model sustainability' (25 points) has no basis in source RFP evaluation criteria",
+    "compliance: 'commercial testing fee schedule' required document has no basis in source RFP submission requirements",
+    "groundedness: source RFP scope is public health outbreak investigation support only — commercial water testing is out of scope"
+  ],
+  "evaluator_notes": "Critical compliance failure. The draft invents a commercial testing revenue model for a federal public health cooperative agreement — this is explicitly prohibited. Federal grants under 2 CFR Part 200 cannot be used to support commercial testing enterprises, and program income (if any) must be treated per 2 CFR Part 200.307, not reinvested without prior approval. The compliance evaluator correctly flags 'commercial use' as a prohibited pattern with a very low compliance score (0.15). This example demonstrates that a technically reasonable Legionella testing scope becomes a compliance failure when out-of-scope commercial activities are added. Parameters are mostly accurate, showing the evaluator correctly isolates compliance from parameter accuracy."
+}

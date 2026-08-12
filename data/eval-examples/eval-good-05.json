@@ -1,0 +1,35 @@
+{
+  "id": "eval-good-05",
+  "label": "PASS — PHEP Emergency Preparedness, Accurate Parameters, Strong Compliance Language",
+  "rfp_id": "Public Health Labs-RFP-2021-PHEP-001",
+  "program_area": "Public Health Emergency Preparedness",
+  "extracted_parameters": {
+    "total_funding": 8500000,
+    "period_of_performance_months": 24,
+    "cost_sharing_required": false,
+    "federal_sponsor": "CDC / OPHPR / DSLR",
+    "award_range_min": 150000,
+    "award_range_max": 600000,
+    "estimated_awards_min": 20,
+    "estimated_awards_max": 28
+  },
+  "generated_draft": {
+    "background": "The Public Health Emergency Preparedness (PHEP) cooperative agreement is the primary federal funding mechanism for building and maintaining state and local public health laboratory emergency readiness. COVID-19 exposed critical gaps in laboratory surge capacity, specimen referral networks, and 24/7 emergency response protocols. This award funds state public health laboratories to achieve and sustain all PHEP laboratory preparedness benchmarks, strengthen All-Hazards surge capacity, and modernize emergency specimen management systems for the post-COVID era. All activities must comply with 2 CFR Part 200 Uniform Guidance and federal grant management requirements.",
+    "funding_parameters": "Total available funding: $8,500,000. Awards: 20–28. Range per laboratory: $150,000–$600,000. Period of performance: 24 months (July 1, 2021 – June 30, 2023). Federal sponsor: CDC / OPHPR / Division of State and Local Readiness. Cost sharing: not required. Indirect costs allowable up to negotiated rate.",
+    "eligibility": "Public Health Labs member state or local public health laboratory serving a PHEP-eligible jurisdiction. CLIA high-complexity certification. Current participation in the Laboratory Response Network (LRN-B and LRN-C where applicable). Documented emergency operations plan incorporating laboratory surge protocols. Human subjects research activities funded under this award must comply with 45 CFR Part 46 and applicable state law.",
+    "scope_of_work": "1. Achieve all PHEP laboratory capability benchmarks within 18 months: 24/7 testing activation ≤2 hours, inter-laboratory specimen referral protocol documented, mass casualty specimen processing plan for ≥500 specimens/day. 2. Implement or maintain LRN-B threat agent testing proficiency for all Category A agents. 3. Expand electronic laboratory reporting to achieve ≥95% automated ELR for all PHEP-notifiable conditions. 4. Conduct minimum 2 full-scale exercises per year (one tabletop, one functional) with after-action reports within 30 days. 5. Maintain and test emergency stockpile of critical reagents and PPE for 90-day operational continuity.",
+    "reporting_requirements": "Quarterly PHEP performance measure submissions to CDC DSLR. Exercise after-action reports within 30 days of each exercise. LRN-B proficiency test results per CDC LRN-B protocol. Final report 90 days post-period of performance. All financial reports per 2 CFR Part 200 requirements including SF-425 Federal Financial Report.",
+    "budget_requirements": "Emergency stockpile reagents and PPE allowable (documented with depletion schedule). Exercise costs (supplies, facilitation, after-action documentation) allowable. ELR interface development costs allowable. 2 CFR Part 200 compliant cost allocation required. No supplanting of existing state funding. Indirect costs at federally negotiated rate only.",
+    "evaluation_criteria": "Current PHEP benchmark achievement (20 points). Surge capacity plan (25 points). LRN integration and exercise plan (25 points). ELR modernization approach (20 points). Budget justification and 2 CFR 200 compliance narrative (10 points).",
+    "submission_instructions": "Deadline: May 28, 2021, 5:00 PM Eastern Time. Submit via Public Health Labs Grants Portal. Required: Narrative (20 pages), SF-424 Application, Budget Narrative, current emergency operations plan laboratory section, LRN membership documentation, most recent PHEP performance measure baseline data."
+  },
+  "evaluation_scores": {
+    "completeness": 1.0,
+    "parameter_accuracy": 1.0,
+    "compliance": 1.0,
+    "groundedness": 0.94,
+    "coherence": 0.95
+  },
+  "gate_decision": "PASS",
+  "evaluator_notes": "Perfect compliance score — explicitly references 2 CFR Part 200, 45 CFR Part 46, SF-425, and no-supplanting requirement. All 8 sections fully populated. Parameters exact match. PHEP program framing accurate: OPHPR/DSLR, LRN-B, All-Hazards, 24/7 activation benchmarks. Exercise requirements (2/year, tabletop + functional) correctly specified. Groundedness very high — all claims traceable to PHEP cooperative agreement program requirements."
+}

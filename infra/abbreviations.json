@@ -1,0 +1,17 @@
+{
+  "apiManagementService": "apim-",
+  "appManagedEnvironments": "cae-",
+  "appContainerApps": "ca-",
+  "cognitiveServicesAccounts": "cog-",
+  "containerRegistryRegistries": "cr",
+  "insightsComponents": "appi-",
+  "keyVaultVaults": "kv-",
+  "machineLearningWorkspaces": "mlw-",
+  "managedIdentityUserAssignedIdentities": "id-",
+  "operationalInsightsWorkspaces": "log-",
+  "resourcesResourceGroups": "rg-",
+  "searchSearchServices": "srch-",
+  "storageStorageAccounts": "st",
+  "webSitesAppService": "app-",
+  "webServerFarms": "asp-"
+}

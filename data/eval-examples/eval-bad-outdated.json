@@ -1,0 +1,43 @@
+{
+  "id": "eval-bad-outdated",
+  "label": "FAIL — Groundedness Failure: Outdated Methods and Retired Program References",
+  "rfp_id": "Public Health Labs-RFP-2021-FOOD-013",
+  "program_area": "Foodborne Disease — PulseNet WGS",
+  "extracted_parameters": {
+    "total_funding": 4100000,
+    "period_of_performance_months": 24,
+    "cost_sharing_required": false,
+    "federal_sponsor": "CDC / NCEZID / DFBMD",
+    "award_range_min": 100000,
+    "award_range_max": 250000,
+    "estimated_awards_min": 18,
+    "estimated_awards_max": 24
+  },
+  "generated_draft": {
+    "background": "PulseNet coordinates molecular subtyping of foodborne pathogens across state public health laboratories. The network relies on pulsed-field gel electrophoresis (PFGE) patterns to cluster Salmonella, STEC O157:H7, and Listeria isolates and detect common-source outbreaks. This funding supports state laboratories in maintaining their PulseNet PFGE capability, purchasing new CHEF-DR III apparatus, and uploading patterns to the CDC PulseNet national database. Laboratories receiving this funding must maintain PFGE as their primary subtyping method for Salmonella and all STEC serotypes.",
+    "funding_parameters": "Total available funding: $4,100,000. Awards: 18–24. Range per laboratory: $100,000–$250,000. Period of performance: 24 months. Federal sponsor: CDC / NCEZID. Cost sharing: not required.",
+    "eligibility": "State PulseNet laboratory with current PFGE capability and CHEF-DR III or equivalent apparatus. CLIA high-complexity certification. Active PulseNet PFGE database participation. Submission of ≥100 PFGE patterns per year.",
+    "scope_of_work": "1. Maintain PFGE capability for Salmonella (XbaI and BlnI digests) and STEC O157:H7 (XbaI digest) as primary subtyping methods. 2. Implement PFGE for non-O157 STEC as per CDC PulseNet PFGE protocols. 3. Upgrade CHEF-DR III apparatus if more than 5 years old. 4. Submit all PFGE patterns to CDC PulseNet database within 4 business days. 5. Participate in quarterly PulseNet PFGE proficiency tests.",
+    "reporting_requirements": "Monthly PFGE submission reports. Proficiency test results. Outbreak investigation reports. Final report.",
+    "budget_requirements": "PFGE reagents (restriction enzymes, PFGE-grade agarose, molecular weight markers) allowable. CHEF apparatus maintenance allowable. PulseNet conference travel allowable.",
+    "evaluation_criteria": "PFGE throughput (30 points). CHEF apparatus status (20 points). Database submission timeliness (25 points). Budget (25 points).",
+    "submission_instructions": "Deadline: November 12, 2021. Submit via Public Health Labs Grants Portal. Required: Narrative, Budget, PFGE proficiency documentation."
+  },
+  "evaluation_scores": {
+    "completeness": 0.68,
+    "parameter_accuracy": 0.88,
+    "compliance": 0.72,
+    "groundedness": 0.14,
+    "coherence": 0.61
+  },
+  "gate_decision": "FAIL",
+  "failure_reasons": [
+    "groundedness: RFP-2021-FOOD-013 explicitly funds WGS implementation and PFGE retirement — draft reverses this, funding PFGE maintenance and expansion",
+    "groundedness: PFGE sunset for Salmonella and STEC was September 2022 (per CDC PulseNet) — draft directs laboratories to maintain PFGE as 'primary subtyping method', directly contradicting the RFP scope",
+    "groundedness: CHEF-DR III apparatus described as the target technology — CDC PulseNet retired PFGE standardization in 2019 for most pathogens",
+    "groundedness: 'PulseNet PFGE database' — CDC migrated to WGS-based NCBI PathogenDB; PFGE Bionumerics database is no longer the national standard",
+    "completeness: scope_of_work lacks WGS, bioinformatics, and multi-pathogen expansion sections required by source RFP",
+    "coherence: scope contradicts stated program area (PulseNet WGS) — internally inconsistent"
+  ],
+  "evaluator_notes": "Severe temporal hallucination — the model generated a draft describing the pre-2019 PulseNet PFGE paradigm for a 2021 RFP that explicitly funds the transition AWAY from PFGE to WGS. This is the inverse of the actual scope. The groundedness evaluator correctly assigns a very low score (0.14) because retrieving the source RFP context makes clear that PFGE retirement is the objective, not PFGE expansion. This example tests whether groundedness catches anachronistic technical content that is factually wrong relative to the grounding documents."
+}

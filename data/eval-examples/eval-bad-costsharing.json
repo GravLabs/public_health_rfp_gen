@@ -1,0 +1,44 @@
+{
+  "id": "eval-bad-costsharing",
+  "label": "FAIL — Parameter Accuracy Failure: Invented Cost Sharing and Wrong Period of Performance",
+  "rfp_id": "Public Health Labs-RFP-2024-GENOMICSURGE-050",
+  "program_area": "Genomic Surveillance — Emergency Surge Capacity",
+  "extracted_parameters": {
+    "total_funding": 5600000,
+    "period_of_performance_months": 24,
+    "cost_sharing_required": true,
+    "federal_sponsor": "CDC / CSELS / OID",
+    "award_range_min": 200000,
+    "award_range_max": 500000,
+    "estimated_awards_min": 14,
+    "estimated_awards_max": 18
+  },
+  "generated_draft": {
+    "background": "This award funds state public health laboratories to establish pathogen-agnostic genomic surge infrastructure for rapid whole genome sequencing of any priority pathogen. Building on COVID-19 sequencing experience, the program expands surge capacity to handle any emerging threat within 72 hours of declaration. Both short-read (Illumina) and long-read (Oxford Nanopore) platforms are supported to enable the fastest possible time-to-complete-genome depending on clinical urgency.",
+    "funding_parameters": "Total available funding: $5,600,000. Awards: 14–18. Range per laboratory: $200,000–$500,000. Period of performance: 24 months (April 1, 2025 – March 31, 2027). Federal sponsor: CDC / CSELS / OID. Cost sharing: required at 15% of the total award amount from non-federal sources. Applicants must document the source of cost share funds in the budget narrative.",
+    "eligibility": "State public health laboratory with WGS capability and CLIA high-complexity certification. Active genomic network participation. Minimum 200 genomes submitted in prior 12 months. Bioinformatician on staff or under contract. Ability to provide 15% cost share from state or institutional funds.",
+    "scope_of_work": "1. Achieve 500 genome equivalents/week surge capacity. 2. Validate Oxford Nanopore rapid workflow for novel threat scenarios. 3. Migrate to cloud bioinformatics infrastructure with 10× elasticity. 4. Develop Emergency Genomic Surge Activation Protocol and conduct annual surge exercises.",
+    "reporting_requirements": "Quarterly genomic output reports. Milestone reports at 6 and 12 months. Annual surge exercise reports. Cost share matching documentation quarterly per 2 CFR Part 200.306. Final report.",
+    "budget_requirements": "Sequencing instruments allowable. Cloud compute allowable. 15% cost share required from non-federal sources. Cost share must be allowable, allocable, necessary, and not from another federal source. Cost share contributions must be documented and verifiable.",
+    "evaluation_criteria": "WGS output and network participation (20 points). Surge expansion plan (25 points). Pathogen-agnostic protocols (25 points). Cloud infrastructure (20 points). Cost share documentation quality (10 points).",
+    "submission_instructions": "Deadline: January 16, 2025. Submit via Public Health Labs Grants Portal. Required: Narrative, Budget, WGS history, cost share commitment letter from institutional official."
+  },
+  "evaluation_scores": {
+    "completeness": 0.72,
+    "parameter_accuracy": 0.0,
+    "compliance": 0.77,
+    "groundedness": 0.55,
+    "coherence": 0.74
+  },
+  "gate_decision": "FAIL",
+  "failure_reasons": [
+    "parameter_accuracy: cost_sharing_required TRUE vs expected FALSE — source RFP-2024-GENOMICSURGE-050 explicitly states cost sharing is not required",
+    "parameter_accuracy: period_of_performance_months 24 vs expected 36 — source specifies 36-month award (April 2025 – March 2028)",
+    "parameter_accuracy: cost_sharing 15% invented with no basis in source RFP",
+    "completeness: mutual aid commitment requirement absent from scope_of_work",
+    "completeness: 90-day cold-standby reagent stockpile absent from budget requirements",
+    "completeness: evaluation criteria 'Cost share documentation quality' replaces source criterion 'Budget justification' — inconsistent with source RFP",
+    "groundedness: cost share requirements and 2 CFR Part 200.306 citation present for a non-cost-share award — fabricated regulatory requirement"
+  ],
+  "evaluator_notes": "The model incorrectly extracted cost sharing as required (15%) and collapsed the 36-month period of performance to 24 months. The 15% cost share requirement is completely fabricated — this RFP has no cost share. The model may have confused this with another federal program (NIH typically requires cost sharing for some grant mechanisms). The parameter_accuracy evaluator correctly assigns 0.0 because cost_sharing_required is wrong and the period of performance is wrong by 33%. The compliance language around cost share (2 CFR Part 200.306) is ironically technically correct for cost-share-bearing grants — demonstrating the model has knowledge of the regulatory framework but misapplied it to a non-cost-share cooperative agreement."
+}

@@ -1,0 +1,45 @@
+{
+  "id": "eval-bad-eligibility",
+  "label": "FAIL — Groundedness Failure: Wrong Eligibility Requirements (Non-Public Health Labs Commercial Lab)",
+  "rfp_id": "Public Health Labs-RFP-2023-CONGSYPH-038",
+  "program_area": "STI — Congenital Syphilis Prevention",
+  "extracted_parameters": {
+    "total_funding": 2700000,
+    "period_of_performance_months": 24,
+    "cost_sharing_required": false,
+    "federal_sponsor": "CDC / NCHHSTP / DSTDP",
+    "award_range_min": 75000,
+    "award_range_max": 225000,
+    "estimated_awards_min": 16,
+    "estimated_awards_max": 22
+  },
+  "generated_draft": {
+    "background": "Congenital syphilis rates have risen dramatically across the United States, requiring expanded laboratory testing access for pregnant women. This cooperative agreement funds laboratories to implement the CDC/Public Health Labs reverse sequence syphilis testing algorithm and expand access to syphilis testing in high-burden prenatal settings.",
+    "funding_parameters": "Total available funding: $2,700,000. Awards: 16–22. Range per laboratory: $75,000–$225,000. Period of performance: 24 months. Federal sponsor: CDC / NCHHSTP / DSTDP. Cost sharing: not required.",
+    "eligibility": "Any CLIA-certified laboratory in the United States with syphilis serology capability, including commercial reference laboratories (Quest Diagnostics, LabCorp, BioReference) and hospital system laboratories. Applicants need not be Public Health Labs members. No minimum CS case requirement in jurisdiction. Commercial laboratories with high syphilis testing volumes are especially encouraged to apply as they have the scale to impact access rapidly.",
+    "scope_of_work": "1. Implement reverse sequence syphilis algorithm. 2. Expand syphilis testing access by accepting specimens from prenatal and OB-GYN clinics. 3. Validate CLIA-waived POC syphilis tests at partner clinic sites. 4. Report syphilis results to state health departments.",
+    "reporting_requirements": "Monthly syphilis testing volumes. Quarterly case contribution reports. Final report.",
+    "budget_requirements": "Syphilis serology reagents allowable. POC test kit procurement allowable. Staff time for training allowable.",
+    "evaluation_criteria": "Current testing volume (30 points). Algorithm implementation (30 points). POC expansion plan (25 points). Budget (15 points).",
+    "submission_instructions": "Deadline: October 25, 2023. Submit via CDC Grants portal or Public Health Labs portal. Required: Narrative, Budget, CLIA certificate."
+  },
+  "evaluation_scores": {
+    "completeness": 0.64,
+    "parameter_accuracy": 0.91,
+    "compliance": 0.72,
+    "groundedness": 0.31,
+    "coherence": 0.65
+  },
+  "gate_decision": "FAIL",
+  "failure_reasons": [
+    "groundedness: eligibility states 'any CLIA-certified laboratory including commercial reference laboratories' — source RFP explicitly restricts to Public Health Labs member state laboratories only",
+    "groundedness: draft encourages Quest Diagnostics, LabCorp, BioReference to apply — these are commercial labs ineligible for Public Health Labs cooperative agreements",
+    "groundedness: 'Applicants need not be Public Health Labs members' directly contradicts eligibility criterion 1 of source RFP",
+    "groundedness: 'No minimum CS case requirement' contradicts source eligibility requiring ≥1 documented CS case in jurisdiction in prior 3 years",
+    "groundedness: 'CDC grants portal' — source specifies Public Health Labs Grants Portal only",
+    "completeness: eligibility section missing state STI program partnership requirement",
+    "completeness: scope missing newborn RPR testing requirement (neonatal serum within 24 hours of birth)",
+    "completeness: submission instructions missing required document list (CS case counts, current SOP, prenatal partner letters)"
+  ],
+  "evaluator_notes": "The draft hallucinated expanded eligibility that fundamentally misrepresents who can apply. Public Health Labs cooperative agreements are restricted to Public Health Labs member state and large local public health laboratories. Commercial reference laboratories (Quest, LabCorp) are categorically ineligible — including them would misuse federal cooperative agreement funds. The groundedness evaluator correctly assigns a very low score (0.31) because the grounding documents (source RFP eligibility section) clearly contradict the eligibility text generated. This failure mode — expanding eligibility beyond what the RFP allows — could lead applicants to waste time and resources applying for an award they cannot receive."
+}

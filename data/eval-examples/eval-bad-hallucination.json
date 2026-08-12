@@ -1,0 +1,54 @@
+{
+  "eval_id": "EVAL-BAD-001",
+  "label": "FAIL",
+  "failure_type": "hallucination",
+  "input": {
+    "program_area": "Wastewater Epidemiology",
+    "federal_sponsor": "CDC / CSELS",
+    "total_funding": 5600000,
+    "award_range": { "min": 100000, "max": 350000 },
+    "period_of_performance_months": 24,
+    "eligibility_summary": "Current NWSS participating lab OR enrolling within 60 days. dPCR/qPCR capability. CLIA certified. Access to 5+ wastewater treatment plant sites.",
+    "priority_areas": [
+      "Multi-pathogen method validation (influenza, RSV, norovirus, mpox)",
+      "Sentinel site expansion to underserved populations",
+      "Automated data pipeline to NWSS within 48 hours",
+      "Epidemiological integration analysis"
+    ]
+  },
+  "generated_output": {
+    "background": "The National Wastewater Surveillance System (NWSS) was established in 2018 by the EPA and CDC to monitor chemical pollutants in municipal water systems. This program has been in operation for over a decade and has successfully identified lead contamination in 47 states. Building on this infrastructure, this RFP expands the program to include pathogen surveillance for influenza, RSV, and other respiratory viruses, leveraging the extensive water treatment monitoring network already in place under the Safe Drinking Water Act.",
+    "funding_parameters": "Total Available: $5,600,000 | Awards: 15–20 | Per-Award Range: $150,000–$500,000 | Period of Performance: 36 months | Sponsor: EPA / Office of Water | Cost sharing: 10% required.",
+    "eligibility": "Applicants must be EPA-certified water testing laboratories with experience in Safe Drinking Water Act compliance testing. Academic research institutions with environmental science programs are also eligible. Private environmental testing companies may apply if they hold EPA Method 300 certification.",
+    "scope_of_work": "Projects must implement EPA Method 1698 for pathogen detection in wastewater. All laboratories must be ISO/IEC 17025 accredited. Results must be submitted to EPA's ECHO database within 7 days of testing. Laboratories must test for PFAS compounds alongside pathogen testing as part of the integrated environmental monitoring approach.",
+    "reporting_requirements": "Monthly reports to EPA. Annual compliance reports under SDWA. Real-time ECHO database updates.",
+    "budget_requirements": "Allowable costs include EPA-approved laboratory equipment and PFAS testing reagents. NIH grant portal submission required for all budgets over $250,000.",
+    "evaluation_criteria": "Applications scored on ISO 17025 accreditation status (40 points), PFAS testing capability (30 points), and geographic coverage (30 points). Minimum score: 60.",
+    "submission_instructions": "Submit via grants.gov by April 1, 2024. Questions to [email protected]."
+  },
+  "eval_scores": {
+    "groundedness": 0.08,
+    "coherence": 0.71,
+    "section_completeness": 0.75,
+    "parameter_accuracy": 0.15,
+    "compliance_coverage": 0.12
+  },
+  "gate_result": "FAIL",
+  "failure_reasons": [
+    "CRITICAL: Federal sponsor wrong — output says EPA, input specifies CDC/CSELS",
+    "CRITICAL: Award range wrong — output says $150K–$500K, correct is $100K–$350K",
+    "CRITICAL: Period of performance wrong — output says 36 months, correct is 24 months",
+    "CRITICAL: Cost sharing wrong — output says 10% required, correct is none required",
+    "HALLUCINATION: NWSS was NOT established in 2018 by EPA — it was established in 2020 by CDC during COVID-19",
+    "HALLUCINATION: NWSS does NOT monitor chemical pollutants or lead — it monitors infectious disease pathogens",
+    "HALLUCINATION: Output references PFAS testing, SDWA, EPA ECHO, ISO 17025 — none of which appear in input",
+    "HALLUCINATION: Output references EPA Method 1698 and grants.gov submission — not in input",
+    "MISSING: No mention of NWSS enrollment requirement, dPCR capability, CLIA certification",
+    "MISSING: No mention of sentinel site expansion or underserved populations",
+    "MISSING: Priority areas A-D from input are absent from scope of work"
+  ],
+  "annotations": {
+    "root_cause": "Model appears to have conflated NWSS with EPA drinking water monitoring programs, then fabricated consistent but entirely wrong details. A plausible-sounding but factually inverted output — exactly the failure mode that go/no-go evaluation gates must catch.",
+    "detection_method": "groundedness_score=0.08 (threshold: 0.85) → auto-rejected before human review"
+  }
+}

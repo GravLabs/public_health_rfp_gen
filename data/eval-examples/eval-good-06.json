@@ -1,0 +1,35 @@
+{
+  "id": "eval-good-06",
+  "label": "PASS — Congenital Syphilis Prevention, POC Testing, Accurate Parameters",
+  "rfp_id": "Public Health Labs-RFP-2023-CONGSYPH-038",
+  "program_area": "STI — Congenital Syphilis Prevention",
+  "extracted_parameters": {
+    "total_funding": 2700000,
+    "period_of_performance_months": 24,
+    "cost_sharing_required": false,
+    "federal_sponsor": "CDC / NCHHSTP / DSTDP",
+    "award_range_min": 75000,
+    "award_range_max": 225000,
+    "estimated_awards_min": 16,
+    "estimated_awards_max": 22
+  },
+  "generated_draft": {
+    "background": "Congenital syphilis cases in the United States reached 3,761 in 2022 — a 755% increase from 2012 and the highest since 1991. Congenital syphilis causes stillbirth, neonatal death, and long-term neurological and sensory disabilities in surviving infants. The epidemic is driven by rising primary and secondary syphilis among reproductive-age women combined with structural failures in prenatal care access and treatment. State public health laboratories play a critical role by ensuring rapid, algorithm-compliant syphilis testing is available at or near point of care in high-burden prenatal settings and providing confirmatory testing for POC reactive results.",
+    "funding_parameters": "Total available funding: $2,700,000. Awards: 16–22. Range per laboratory: $75,000–$225,000. Period of performance: 24 months (January 1, 2024 – December 31, 2025). Federal sponsor: CDC / NCHHSTP / DSTDP. Cost sharing: not required.",
+    "eligibility": "Public Health Labs member state laboratory with treponemal EIA/CIA and non-treponemal (RPR) syphilis serology capability. CLIA high-complexity certification. Documented CS cases in jurisdiction (≥1 in prior 3 years). Partnership with state STI program and at least one prenatal or OB-GYN provider.",
+    "scope_of_work": "1. Implement CDC/Public Health Labs reverse sequence syphilis algorithm: treponemal EIA first, reflex to RPR, reflex to TPPA for discordant results. Achieve RPR turnaround ≤24 hours from reactive treponemal result. 2. Demonstrate surge capacity to process 200% of baseline syphilis volume using optimized workflow and after-hours protocols. Implement ≤2 hour turnaround for urgent prenatal syphilis testing (labor and delivery). 3. Validate and support rollout of CLIA-waived syphilis POC tests at ≥3 prenatal/OB-GYN clinic sites in high-CS-burden areas. Provide QA oversight and reactive specimen confirmatory testing. 4. Implement RPR testing on neonatal serum within 24 hours of birth for infants of seropositive mothers.",
+    "reporting_requirements": "Monthly syphilis testing volumes by stage and algorithm step. Quarterly CS case laboratory contribution reports. Quarterly POC site performance reports. Final report 90 days post-period of performance.",
+    "budget_requirements": "Treponemal EIA/CIA reagents, RPR cards, TPPA confirmatory reagents allowable. POC test kits (Chembio DPP or equivalent) for validation allowable. EHR integration development costs allowable (not ongoing licenses). Staff time for POC site QA oversight and provider training allowable.",
+    "evaluation_criteria": "CS burden in jurisdiction (20 points). Syphilis algorithm implementation plan (25 points). Surge capacity demonstration (20 points). POC site network plan (20 points). Budget justification (15 points).",
+    "submission_instructions": "Deadline: October 25, 2023, 5:00 PM Eastern Time. Submit via Public Health Labs Grants Portal. Required: Narrative (14 pages), Budget, jurisdiction CS case counts (3-year), current syphilis algorithm SOP, prenatal provider letters of intent for POC partnership."
+  },
+  "evaluation_scores": {
+    "completeness": 1.0,
+    "parameter_accuracy": 1.0,
+    "compliance": 0.92,
+    "groundedness": 0.94,
+    "coherence": 0.95
+  },
+  "gate_decision": "PASS",
+  "evaluator_notes": "All 8 sections complete. CS case count (3,761 in 2022, 755% increase) correctly stated from source. Reverse sequence algorithm (treponemal first, TPPA for discordant) correctly described per CDC/Public Health Labs recommendation. TPPA correctly spelled out as TP-PA. Surge capacity target (200% of baseline) matches source. POC site count (≥3) and Chembio DPP reference accurate. Parameters exact match. Strong groundedness — specific laboratory algorithm and turnaround times match source RFP."
+}

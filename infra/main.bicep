@@ -1,0 +1,212 @@
+targetScope = 'subscription'
+
+@description('Environment name (dev, staging, prod)')
+param environmentName string
+
+@description('Azure region for all resources')
+param location string = 'eastus'
+
+param apimPublisherEmail string = 'admin@example.com'
+param ownerEmail string = 'owner@example.com'
+param openAiModelName string = 'gpt-4o'
+param openAiModelVersion string = '2024-08-06'
+param embeddingModelName string = 'text-embedding-3-large'
+param searchSkuName string = 'basic'
+param budgetAmountUsd int = 500
+param botMessagingEndpoint string = 'https://placeholder.example.com/api/messages'
+param tags object = {}
+
+var abbrs = loadJsonContent('./abbreviations.json')
+var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
+var prefix = '${abbrs.resourcesResourceGroups}${environmentName}'
+
+// Resource Group
+resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+  name: '${prefix}-pubhealth-rfp-${resourceToken}'
+  location: location
+  tags: tags
+}
+
+// User-assigned managed identity (used by all services — no keys in code)
+module identity 'modules/identity.bicep' = {
+  name: 'identity'
+  scope: rg
+  params: {
+    name: '${abbrs.managedIdentityUserAssignedIdentities}pubhealth-${resourceToken}'
+    location: location
+    tags: tags
+  }
+}
+
+// Storage Account (ADLS Gen2 for raw RFP corpus)
+module storage 'modules/storage.bicep' = {
+  name: 'storage'
+  scope: rg
+  params: {
+    name: '${abbrs.storageStorageAccounts}pubhealth${resourceToken}'
+    location: location
+    tags: tags
+    identityPrincipalId: identity.outputs.principalId
+  }
+}
+
+// Key Vault
+module keyVault 'modules/keyvault.bicep' = {
+  name: 'keyvault'
+  scope: rg
+  params: {
+    name: '${abbrs.keyVaultVaults}pubhealth-${resourceToken}'
+    location: location
+    tags: tags
+    identityPrincipalId: identity.outputs.principalId
+  }
+}
+
+// Azure OpenAI
+module openAi 'modules/openai.bicep' = {
+  name: 'openai'
+  scope: rg
+  params: {
+    name: '${abbrs.cognitiveServicesAccounts}pubhealth-oai-${resourceToken}'
+    location: location
+    tags: tags
+    identityPrincipalId: identity.outputs.principalId
+    gptModelName: openAiModelName
+    gptModelVersion: openAiModelVersion
+    embeddingModelName: embeddingModelName
+  }
+}
+
+// Azure AI Document Intelligence
+module docIntelligence 'modules/doc-intelligence.bicep' = {
+  name: 'docIntelligence'
+  scope: rg
+  params: {
+    name: '${abbrs.cognitiveServicesAccounts}pubhealth-di-${resourceToken}'
+    location: location
+    tags: tags
+    identityPrincipalId: identity.outputs.principalId
+  }
+}
+
+// Azure AI Search
+module search 'modules/ai-search.bicep' = {
+  name: 'search'
+  scope: rg
+  params: {
+    name: '${abbrs.searchSearchServices}pubhealth-${resourceToken}'
+    location: location
+    tags: tags
+    skuName: searchSkuName
+    identityPrincipalId: identity.outputs.principalId
+  }
+}
+
+// Log Analytics + Application Insights
+module monitoring 'modules/monitoring.bicep' = {
+  name: 'monitoring'
+  scope: rg
+  params: {
+    logAnalyticsName: '${abbrs.operationalInsightsWorkspaces}pubhealth-${resourceToken}'
+    appInsightsName: '${abbrs.insightsComponents}pubhealth-${resourceToken}'
+    location: location
+    tags: tags
+  }
+}
+
+// Azure AI Foundry Hub + Project
+module aiFoundry 'modules/ai-foundry.bicep' = {
+  name: 'aiFoundry'
+  scope: rg
+  params: {
+    hubName: '${abbrs.machineLearningWorkspaces}pubhealth-hub-${resourceToken}'
+    projectName: '${abbrs.machineLearningWorkspaces}pubhealth-rfp-${resourceToken}'
+    location: location
+    tags: tags
+    identityPrincipalId: identity.outputs.principalId
+    openAiResourceId: openAi.outputs.resourceId
+    searchResourceId: search.outputs.resourceId
+    storageResourceId: storage.outputs.resourceId
+    keyVaultResourceId: keyVault.outputs.resourceId
+    appInsightsResourceId: monitoring.outputs.appInsightsId
+  }
+}
+
+// Container Apps Environment + Registry (for FastAPI review API)
+module containerApps 'modules/container-apps.bicep' = {
+  name: 'containerApps'
+  scope: rg
+  params: {
+    envName: '${abbrs.appManagedEnvironments}pubhealth-${resourceToken}'
+    registryName: '${abbrs.containerRegistryRegistries}pubhealth${resourceToken}'
+    location: location
+    tags: tags
+    logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsId
+  }
+}
+
+// AI Gateway — APIM with semantic caching, token budgets, backend pool
+module apim 'modules/apim.bicep' = {
+  name: 'apim'
+  scope: rg
+  params: {
+    name: '${abbrs.apiManagementService}pubhealth-${resourceToken}'
+    location: location
+    tags: tags
+    publisherEmail: apimPublisherEmail
+    openAiEndpoint: openAi.outputs.endpoint
+    openAiResourceId: openAi.outputs.resourceId
+    appInsightsId: monitoring.outputs.appInsightsId
+    appInsightsInstrumentationKey: monitoring.outputs.instrumentationKey
+  }
+}
+
+// Teams Bot — channels registration + Teams channel
+module botService 'modules/bot-service.bicep' = {
+  name: 'botService'
+  scope: rg
+  params: {
+    name: 'bot-pubhealth-rfp-${resourceToken}'
+    tags: tags
+    messagingEndpoint: botMessagingEndpoint
+    microsoftAppId: identity.outputs.clientId
+  }
+}
+
+// Azure Budget Alert ($500/mo)
+module budget 'modules/budget.bicep' = {
+  name: 'budget'
+  scope: rg
+  params: {
+    budgetName: 'pubhealth-rfp-poc-budget'
+    amount: budgetAmountUsd
+    contactEmails: [ownerEmail]
+  }
+}
+
+// Outputs used by AZD and application code
+output AZURE_RESOURCE_GROUP string = rg.name
+output AZURE_LOCATION string = location
+output AZURE_TENANT_ID string = tenant().tenantId
+output AZURE_CLIENT_ID string = identity.outputs.clientId
+
+output AZURE_OPENAI_ENDPOINT string = openAi.outputs.endpoint
+output AZURE_OPENAI_GPT_DEPLOYMENT string = openAiModelName
+output AZURE_OPENAI_EMBEDDING_DEPLOYMENT string = embeddingModelName
+
+output AZURE_SEARCH_ENDPOINT string = search.outputs.endpoint
+output AZURE_SEARCH_INDEX string = 'pubhealth-rfp-index'
+
+output AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT string = docIntelligence.outputs.endpoint
+
+output AZURE_STORAGE_ACCOUNT string = storage.outputs.name
+output AZURE_STORAGE_CONTAINER string = 'rfp-corpus'
+
+output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.appInsightsConnectionString
+
+output AZURE_APIM_GATEWAY_URL string = apim.outputs.gatewayUrl
+output AZURE_APIM_NAME string = apim.outputs.apimName
+
+output AZURE_AI_FOUNDRY_PROJECT_ENDPOINT string = aiFoundry.outputs.projectEndpoint
+
+output AZURE_BOT_NAME string = botService.outputs.botName

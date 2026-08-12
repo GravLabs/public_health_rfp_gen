@@ -1,0 +1,1344 @@
+<title>RFP Generator Architecture</title>
+<style>
+  :root {
+    --ground:      #0B1120;
+    --surface:     #111827;
+    --surface-2:   #1A2436;
+    --surface-3:   #232F42;
+    --border:      #2A3A52;
+    --text-1:      #E2E8F0;
+    --text-2:      #94A3B8;
+    --text-3:      #64748B;
+    --accent:      #38BDF8;
+    --accent-soft: #0C2D42;
+    --green:       #34D399;
+    --green-soft:  #052E1C;
+    --amber:       #FBBF24;
+    --amber-soft:  #2D1B00;
+    --red:         #F87171;
+    --red-soft:    #2D0808;
+    --purple:      #A78BFA;
+    --radius:      6px;
+    --shadow:      0 1px 4px rgba(0,0,0,.5);
+    --mono:        'Cascadia Code', 'Fira Code', 'Consolas', 'SF Mono', monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --ground:      #F0F4F8;
+      --surface:     #FFFFFF;
+      --surface-2:   #EEF2F7;
+      --surface-3:   #E2E9F2;
+      --border:      #C8D5E5;
+      --text-1:      #0F172A;
+      --text-2:      #334155;
+      --text-3:      #64748B;
+      --accent:      #0369A1;
+      --accent-soft: #E0F2FE;
+      --green:       #059669;
+      --green-soft:  #D1FAE5;
+      --amber:       #B45309;
+      --amber-soft:  #FEF3C7;
+      --red:         #B91C1C;
+      --red-soft:    #FEE2E2;
+      --purple:      #7C3AED;
+      --shadow:      0 1px 4px rgba(0,0,0,.1);
+    }
+  }
+  :root[data-theme="light"] {
+    --ground:      #F0F4F8;
+    --surface:     #FFFFFF;
+    --surface-2:   #EEF2F7;
+    --surface-3:   #E2E9F2;
+    --border:      #C8D5E5;
+    --text-1:      #0F172A;
+    --text-2:      #334155;
+    --text-3:      #64748B;
+    --accent:      #0369A1;
+    --accent-soft: #E0F2FE;
+    --green:       #059669;
+    --green-soft:  #D1FAE5;
+    --amber:       #B45309;
+    --amber-soft:  #FEF3C7;
+    --red:         #B91C1C;
+    --red-soft:    #FEE2E2;
+    --purple:      #7C3AED;
+    --shadow:      0 1px 4px rgba(0,0,0,.1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; font-size: 16px; }
+  body {
+    background: var(--ground);
+    color: var(--text-1);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    line-height: 1.65;
+    display: flex;
+    min-height: 100vh;
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  /* ── Sidebar nav ──────────────────────────────────────────────────────────── */
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+    padding: 28px 0 40px;
+  }
+  .sidebar-logo {
+    padding: 0 18px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .sidebar-logo .mark {
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--accent);
+    font-weight: 700;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .sidebar-logo .title {
+    font-size: .95rem;
+    font-weight: 700;
+    color: var(--text-1);
+    font-family: 'Palatino Linotype', Palatino, serif;
+  }
+  .nav-group { margin-bottom: 4px; }
+  .nav-group-label {
+    font-size: .67rem;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-weight: 700;
+    color: var(--text-3);
+    padding: 10px 18px 4px;
+    display: block;
+  }
+  .nav-link {
+    display: block;
+    padding: 5px 18px;
+    font-size: .82rem;
+    color: var(--text-2);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+  }
+  .nav-link:hover { color: var(--accent); border-left-color: var(--accent); }
+
+  /* ── Main content ─────────────────────────────────────────────────────────── */
+  .main { flex: 1; min-width: 0; padding: 40px 48px 80px; max-width: 900px; }
+
+  /* ── Typography ───────────────────────────────────────────────────────────── */
+  h1 {
+    font-family: 'Palatino Linotype', Palatino, serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: -.03em;
+    line-height: 1.1;
+    color: var(--text-1);
+    margin-bottom: 10px;
+  }
+  h2 {
+    font-family: 'Palatino Linotype', Palatino, serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: var(--text-1);
+    margin: 56px 0 14px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  h3 { font-size: 1rem; font-weight: 700; color: var(--text-1); margin: 22px 0 8px; }
+  p  { color: var(--text-2); margin-bottom: 14px; font-size: 1rem; }
+  strong { color: var(--text-1); font-weight: 600; }
+  ul, ol { padding-left: 1.4em; margin-bottom: 12px; }
+  li { margin-bottom: 4px; color: var(--text-2); font-size: 1rem; }
+
+  /* ── Code ─────────────────────────────────────────────────────────────────── */
+  code {
+    font-family: var(--mono);
+    font-size: .82rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--accent);
+  }
+  pre {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: .8rem;
+    line-height: 1.6;
+    margin: 14px 0;
+    color: var(--text-1);
+  }
+  pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+  .comment { color: var(--text-3); }
+  .kw { color: var(--accent); }
+  .str { color: var(--green); }
+  .num { color: var(--amber); }
+  .type { color: var(--purple); }
+
+  /* ── Tables ───────────────────────────────────────────────────────────────── */
+  .table-wrap { overflow-x: auto; margin: 14px 0; border-radius: var(--radius); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  thead th {
+    background: var(--surface-2); color: var(--text-3);
+    font-size: .7rem; text-transform: uppercase; letter-spacing: .08em;
+    font-weight: 700; padding: 8px 14px; text-align: left;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 8px 14px; vertical-align: top; }
+  tbody tr:hover { background: var(--surface-2); }
+  .mono-cell { font-family: var(--mono); font-size: .78rem; color: var(--accent); }
+  .right { text-align: right; font-variant-numeric: tabular-nums; }
+  .total-row td { font-weight: 700; border-top: 2px solid var(--border) !important; }
+
+  /* ── Mermaid diagrams ─────────────────────────────────────────────────────── */
+  .diagram {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: var(--radius);
+    padding: 18px;
+    overflow-x: auto;
+    margin: 14px 0;
+  }
+  .diagram .mermaid { min-width: 0; }
+
+  /* ── Callouts ─────────────────────────────────────────────────────────────── */
+  .callout {
+    border-radius: var(--radius); padding: 12px 16px;
+    margin: 14px 0; font-size: .85rem;
+    display: flex; gap: 10px; align-items: flex-start;
+    line-height: 1.5;
+  }
+  .callout.info   { background: var(--accent-soft); border-left: 3px solid var(--accent); color: var(--text-1); }
+  .callout.green  { background: var(--green-soft);  border-left: 3px solid var(--green);  color: var(--text-1); }
+  .callout.amber  { background: var(--amber-soft);  border-left: 3px solid var(--amber);  color: var(--text-1); }
+  .callout.red    { background: var(--red-soft);    border-left: 3px solid var(--red);    color: var(--text-1); }
+
+  /* ── Phase blocks ─────────────────────────────────────────────────────────── */
+  .phase-grid { display: flex; flex-direction: column; gap: 12px; margin: 14px 0; }
+  .phase-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+  }
+  .phase-block h3 { margin: 0 0 8px; font-size: .88rem; }
+  .phase-block ul { margin: 0; }
+
+  /* ── Hero ─────────────────────────────────────────────────────────────────── */
+  .hero { padding-bottom: 24px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+  .hero .eyebrow {
+    font-size: .7rem; text-transform: uppercase;
+    letter-spacing: .12em; color: var(--accent);
+    font-weight: 700; margin-bottom: 10px; display: block;
+  }
+  .hero .lead { font-size: .92rem; color: var(--text-2); max-width: 68ch; }
+
+  /* ── Tag chips ────────────────────────────────────────────────────────────── */
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .tag {
+    font-size: .72rem; font-weight: 600; padding: 2px 8px;
+    border-radius: 20px; border: 1px solid;
+    white-space: nowrap;
+  }
+  .tag.blue   { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  .tag.green  { color: var(--green);  border-color: var(--green);  background: var(--green-soft); }
+  .tag.amber  { color: var(--amber);  border-color: var(--amber);  background: var(--amber-soft); }
+  .tag.purple { color: var(--purple); border-color: var(--purple); background: color-mix(in srgb, var(--purple) 15%, transparent); }
+
+  /* ── Section anchor spacer ────────────────────────────────────────────────── */
+  section { scroll-margin-top: 24px; }
+
+  /* ── Responsive ───────────────────────────────────────────────────────────── */
+  @media (max-width: 720px) {
+    .sidebar { display: none; }
+    .main    { padding: 28px 18px 64px; }
+  }
+</style>
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <span class="mark">Technical Reference</span>
+    <span class="title">RFP Generator Platform</span>
+  </div>
+
+  <div class="nav-group">
+    <span class="nav-group-label">Overview</span>
+    <a class="nav-link" href="#overview">System Overview</a>
+    <a class="nav-link" href="#layers">Architecture Layers</a>
+  </div>
+  <div class="nav-group">
+    <span class="nav-group-label">UX &amp; API</span>
+    <a class="nav-link" href="#teams-bot">Teams Bot</a>
+    <a class="nav-link" href="#streaming">Live Card Preview</a>
+    <a class="nav-link" href="#api">FastAPI Surface</a>
+    <a class="nav-link" href="#ux-options">UX Options</a>
+  </div>
+  <div class="nav-group">
+    <span class="nav-group-label">Model Gateway</span>
+    <a class="nav-link" href="#apim">APIM Gateway</a>
+    <a class="nav-link" href="#apim-policy">Policy Lifecycle</a>
+    <a class="nav-link" href="#backend-pool">Backend Pool</a>
+    <a class="nav-link" href="#model-routing">Model Routing</a>
+  </div>
+  <div class="nav-group">
+    <span class="nav-group-label">AI Foundry</span>
+    <a class="nav-link" href="#agents">Agent Topology</a>
+    <a class="nav-link" href="#finetune">Fine-Tuning</a>
+    <a class="nav-link" href="#promptflow">Prompt Flow</a>
+    <a class="nav-link" href="#evaluation">Evaluation Gate</a>
+    <a class="nav-link" href="#content-safety">Content Safety</a>
+  </div>
+  <div class="nav-group">
+    <span class="nav-group-label">Data Platform</span>
+    <a class="nav-link" href="#search">AI Search Index</a>
+    <a class="nav-link" href="#sharepoint">SharePoint</a>
+    <a class="nav-link" href="#fabric">Fabric / OneLake</a>
+  </div>
+  <div class="nav-group">
+    <span class="nav-group-label">Operations</span>
+    <a class="nav-link" href="#observability">Observability</a>
+    <a class="nav-link" href="#container-apps">Container Apps</a>
+    <a class="nav-link" href="#bicep">Bicep Modules</a>
+    <a class="nav-link" href="#cost">Cost Estimate</a>
+    <a class="nav-link" href="#phases">Implementation Phases</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ── Hero ────────────────────────────────────────────────────────────────── -->
+  <div class="hero">
+    <span class="eyebrow">Open-Source Accelerator · v0.1</span>
+    <h1>RFP Generation Platform</h1>
+    <p class="lead">Full architecture reference for engineers and cloud architects. Covers all Azure AI Foundry capabilities, Model Gateway policies, agent topology, data platform, and Bicep infrastructure.</p>
+    <div class="tags">
+      <span class="tag blue">Azure AI Foundry</span>
+      <span class="tag blue">APIM AI Gateway</span>
+      <span class="tag blue">GPT-4o Fine-Tuned</span>
+      <span class="tag green">Teams Bot Framework</span>
+      <span class="tag green">FastAPI</span>
+      <span class="tag green">Semantic Kernel</span>
+      <span class="tag purple">Microsoft Fabric</span>
+      <span class="tag purple">AI Search</span>
+      <span class="tag amber">Bicep + azd</span>
+    </div>
+  </div>
+
+  <!-- ── System Overview ─────────────────────────────────────────────────────── -->
+  <section id="overview">
+    <h2>System Overview</h2>
+    <p>End-to-end flow: Teams Bot → FastAPI → APIM AI Gateway → Azure AI Foundry Agents → Prompt Flow DAG → Evaluation Gate → SharePoint. Data ingest runs as a separate Fabric pipeline from SharePoint into AI Search.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+graph TB
+  subgraph UX["UX Layer"]
+    T["Teams Bot\n(ActivityHandler)"]
+  end
+
+  subgraph API["API Layer — Container Apps"]
+    F["FastAPI\n/api/messages\n/generate\n/evaluate\n/search"]
+    SK["Semantic Kernel\nOrchestrator (.NET)"]
+  end
+
+  subgraph GW["Model Gateway — APIM Consumption"]
+    direction TB
+    AP["AI Gateway Policies\n• Managed-identity auth\n• Semantic cache (0.05)\n• Token budget 500K/min\n• emit-token-metric"]
+    BP["Backend Pool\nFine-tuned GPT-4o p1\nBase GPT-4o p2"]
+  end
+
+  subgraph AI["Azure AI Foundry"]
+    direction TB
+    AG["Agent Service\nCoordinator + 5 Specialists"]
+    PF["Prompt Flow DAG\nClassify → Search → Generate → Evaluate"]
+    FT["Fine-Tuned GPT-4o\n50-RFP domain adaptation"]
+    EV["AI Evaluations SDK\n5-dimension gate"]
+    CS["Content Safety\nPII + harmful content"]
+  end
+
+  subgraph Data["Data Platform"]
+    SR["AI Search\nHNSW vector + hybrid\npubhealth-rfp-semantic"]
+    SP["SharePoint\nRFP Corpus library\nGenerated Drafts library"]
+    OL["OneLake / Fabric\n6 Delta tables\nPower BI semantic model"]
+  end
+
+  T --> F
+  F --> SK
+  SK --> AP
+  AP --> BP
+  BP --> FT
+  BP --> AG
+  AG --> PF
+  PF --> SR
+  PF --> EV
+  F --> CS
+  SP -->|Graph API ingest| SR
+  EV -->|passed drafts| SP
+  SR --> OL
+  EV --> OL
+      </pre>
+    </div>
+  </section>
+
+  <!-- ── Architecture Layers ─────────────────────────────────────────────────── -->
+  <section id="layers">
+    <h2>Architecture Layers</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Services</th><th>Auth</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>UX</strong></td>
+            <td>Azure Bot Service F0 + Teams Channel</td>
+            <td>UserAssignedMSI</td>
+            <td>Webhook to FastAPI <code>/api/messages</code></td>
+          </tr>
+          <tr>
+            <td><strong>API</strong></td>
+            <td>FastAPI (Python), Semantic Kernel 1.21.1 (.NET)</td>
+            <td>DefaultAzureCredential</td>
+            <td>Two Container Apps sharing a single managed identity</td>
+          </tr>
+          <tr>
+            <td><strong>Model Gateway</strong></td>
+            <td>APIM Consumption SKU</td>
+            <td>SystemAssigned → Cognitive Services User</td>
+            <td>No API keys in application code — APIM holds identity</td>
+          </tr>
+          <tr>
+            <td><strong>AI Platform</strong></td>
+            <td>AI Foundry Hub + Project, Agent Service, Prompt flows, AI Evaluations, Content Safety</td>
+            <td>DefaultAzureCredential</td>
+            <td>Foundry project endpoint used for all Foundry API calls</td>
+          </tr>
+          <tr>
+            <td><strong>Data</strong></td>
+            <td>AI Search (S1), Storage, SharePoint (Graph API), Microsoft Fabric F2</td>
+            <td>DefaultAzureCredential / Graph MSAL</td>
+            <td>OneLake via Fabric Lakehouse; Fabric AI Skill wraps search</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Teams Bot ───────────────────────────────────────────────────────────── -->
+  <section id="teams-bot">
+    <h2>Teams Bot</h2>
+    <p>Bot Framework SDK ActivityHandler receives messages via Azure Bot Service F0 webhook. The bot translates natural-language commands to FastAPI calls and formats responses as Adaptive Cards.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+graph TD
+  MSG["① Program Officer\n'Draft influenza RFP — $2.5M, 24 months'"]
+  CARD0["② Bot sends initial progress card\n0 / 8 sections — immediately"]
+  STREAM["③ Background NDJSON stream\nPOST /generate/stream"]
+  LOOP["④ Each section completes\nBot calls UpdateActivity\n1/8 ✓ … 8/8 ✓"]
+  EVAL["⑤ Evaluation gate\nGroundedness · Coherence · Compliance\nCompleteness · Parameter Accuracy"]
+  UPLOAD["⑥ upload_draft_docx()\n→ SharePoint Generated Drafts"]
+  FINAL["⑦ Final result card\nScores + Open Word in SharePoint button"]
+
+  MSG --> CARD0
+  CARD0 --> STREAM
+  STREAM --> LOOP
+  LOOP --> EVAL
+  EVAL --> UPLOAD
+  UPLOAD --> FINAL
+      </pre>
+    </div>
+
+    <h3>Key files</h3>
+    <ul>
+      <li><code>src/bot/bot.py</code> — <code>RfpBotHandler(ActivityHandler)</code>, sends initial card then streams via <code>asyncio.create_task</code></li>
+      <li><code>src/bot/bot.py</code> — <code>_progress_card()</code> / <code>_result_card()</code> — Adaptive Card dict builders (no JSON template files needed)</li>
+      <li><code>infra/modules/bot-service.bicep</code> — Bot Service F0 + MsTeamsChannel registration</li>
+    </ul>
+
+    <div class="callout info">
+      Bot Service F0 is free for unlimited Teams messages. No M365 Copilot or Teams Premium license required. The bot appears in Teams as a personal app after sideloading the app manifest during post-provision.
+    </div>
+  </section>
+
+  <!-- ── Streaming Architecture ──────────────────────────────────────────────── -->
+  <section id="streaming">
+    <h2>Streaming Architecture — Live Card Preview</h2>
+    <p>The bot updates the Teams Adaptive Card in-place after each section completes using Bot Framework's <code>UpdateActivity</code>. This requires NDJSON streams from both FastAPI and the .NET orchestrator.</p>
+
+    <h3>NDJSON event contract</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Event type</th><th>Emitter</th><th>Key fields</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono-cell">started</td>
+            <td>FastAPI</td>
+            <td><code>draft_id</code>, <code>rfp_id</code></td>
+          </tr>
+          <tr>
+            <td class="mono-cell">section</td>
+            <td>Orchestrator → FastAPI pass-through</td>
+            <td><code>section_key</code>, <code>index</code>, <code>total</code></td>
+          </tr>
+          <tr>
+            <td class="mono-cell">gate_result</td>
+            <td>FastAPI (after evaluation + persist)</td>
+            <td><code>passed</code>, <code>scores</code>, <code>failure_reasons</code>, <code>sharepoint_url</code></td>
+          </tr>
+          <tr>
+            <td class="mono-cell">error</td>
+            <td>FastAPI</td>
+            <td><code>message</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Orchestrator streaming endpoint (C#)</h3>
+    <pre><code><span class="comment">// Program.cs — /generate/stream yields NDJSON as each section completes</span>
+app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest request, RfpOrchestrationService orchestrator,
+    HttpContext httpContext, CancellationToken ct) =>
+{
+    httpContext.Response.ContentType = <span class="str">"application/x-ndjson"</span>;
+    httpContext.Response.Headers.CacheControl = <span class="str">"no-cache"</span>;
+    <span class="kw">var</span> opts = <span class="kw">new</span> JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    await foreach (<span class="kw">var</span> evt <span class="kw">in</span> orchestrator.GenerateSectionsStreamAsync(request, ct))
+    {
+        await httpContext.Response.WriteAsync(JsonSerializer.Serialize(evt, opts) + <span class="str">"\n"</span>, ct);
+        await httpContext.Response.Body.FlushAsync(ct);
+    }
+});</code></pre>
+
+    <h3>Bot card update pattern (Python)</h3>
+    <pre><code><span class="comment"># bot.py — background task consumes the FastAPI stream</span>
+<span class="kw">async def</span> _stream_and_update(turn_context, activity_id, params, subtitle):
+    completed = []
+    <span class="kw">async with</span> httpx.AsyncClient(timeout=<span class="num">300</span>) <span class="kw">as</span> client:
+        <span class="kw">async with</span> client.stream(<span class="str">"POST"</span>, f<span class="str">"{API_URL}/generate/stream"</span>, json=params) <span class="kw">as</span> resp:
+            <span class="kw">async for</span> line <span class="kw">in</span> resp.aiter_lines():
+                event = json.loads(line)
+
+                <span class="kw">if</span> event[<span class="str">"type"</span>] == <span class="str">"section"</span>:
+                    completed.append(event[<span class="str">"section_key"</span>])
+                    card = _progress_card(completed, next_section, subtitle)
+                    await turn_context.update_activity(
+                        Activity(id=activity_id, attachments=[CardFactory.adaptive_card(card)])
+                    )
+                <span class="kw">elif</span> event[<span class="str">"type"</span>] == <span class="str">"gate_result"</span>:
+                    await turn_context.update_activity(
+                        Activity(id=activity_id, attachments=[CardFactory.adaptive_card(
+                            _result_card(event, subtitle)
+                        )])
+                    )</code></pre>
+  </section>
+
+  <!-- ── FastAPI Surface ─────────────────────────────────────────────────────── -->
+  <section id="api">
+    <h2>FastAPI Surface</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Path</th><th>Request Body</th><th>Response</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>POST</td>
+            <td class="mono-cell">/generate</td>
+            <td><code>program_area, sponsor, amount, period, description</code></td>
+            <td><code>RfpDraft</code> + gate scores</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td class="mono-cell">/generate/stream</td>
+            <td><code>RfpRequest</code> (same as /generate)</td>
+            <td>NDJSON stream: <code>started → section×8 → gate_result</code>; used by Teams bot for live card updates</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td class="mono-cell">/evaluate</td>
+            <td><code>draft_id, criteria</code></td>
+            <td>5-dimension scores + pass/fail</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td class="mono-cell">/search</td>
+            <td><code>query, top_k, section_type_filter</code></td>
+            <td>Vector + hybrid search results</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td class="mono-cell">/api/messages</td>
+            <td>Bot Framework Activity</td>
+            <td>ActivityResponse (Teams card)</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td class="mono-cell">/review</td>
+            <td><code>rfp_id, proposal_text</code></td>
+            <td>Per-criterion scores + recommendation</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td class="mono-cell">/classify</td>
+            <td><code>description</code></td>
+            <td><code>program_area</code> + confidence</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td class="mono-cell">/health</td>
+            <td>—</td>
+            <td>Service health + dependency status</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>All endpoints use <code>DefaultAzureCredential</code> — no API keys in configuration. The lifespan context manager initializes all SDK clients (AI Search, Foundry, APIM token) at startup.</p>
+  </section>
+
+  <!-- ── UX Options ──────────────────────────────────────────────────────────── -->
+  <section id="ux-options">
+    <h2>UX Options</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Cost/User/Mo</th><th>License Required</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Teams Bot (Bot Framework)</strong></td>
+            <td class="right">$0</td>
+            <td>None — standard Teams inclusion</td>
+            <td><span class="tag green">Selected</span></td>
+          </tr>
+          <tr>
+            <td>Power Platform + Copilot Studio</td>
+            <td class="right">$0–10</td>
+            <td>Power Platform per-user or per-flow</td>
+            <td><span class="tag amber">Alternative</span></td>
+          </tr>
+          <tr>
+            <td>M365 Copilot Declarative Agent</td>
+            <td class="right">$30</td>
+            <td>Microsoft 365 Copilot</td>
+            <td><span class="tag amber">Future option</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── APIM Gateway ────────────────────────────────────────────────────────── -->
+  <section id="apim">
+    <h2>APIM AI Gateway</h2>
+    <p>API Management Consumption SKU sits between all application code and AI Foundry model deployments. All Azure OpenAI calls route through <code>apim-pubhealth-{token}/openai</code>.</p>
+
+    <h3>Consumers and token budgets</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Subscription</th><th>Consumer</th><th>Token Limit (per min)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono-cell">sub-generation</td><td>RFP Generation (Foundry Agent + Prompt Flow)</td><td class="right">500,000</td></tr>
+          <tr><td class="mono-cell">sub-evaluation</td><td>Evaluation Gate (5-dimension, AI Evaluations SDK)</td><td class="right">500,000</td></tr>
+          <tr><td class="mono-cell">sub-agents</td><td>Specialist Agents (Proposal Review, Regulatory, Audit)</td><td class="right">500,000</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── APIM Policy Lifecycle ───────────────────────────────────────────────── -->
+  <section id="apim-policy">
+    <h2>Gateway Policy Lifecycle</h2>
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TD
+  REQ["Inbound\nRequest"] --> AUTH["Managed\nIdentity Auth"]
+  AUTH --> CACHE_L["Semantic\nCache Lookup"]
+  CACHE_L --> HIT{"Cache\nhit?"}
+  HIT -->|yes| RESP["Response"]
+  HIT -->|no| LIMIT["Token\nRate Limit"]
+  LIMIT --> ROUTE["Backend\nRouting"]
+  ROUTE --> BACKEND["Backend\nPool"]
+  BACKEND --> CACHE_S["Cache\nStore 1hr"]
+  CACHE_S --> METRIC["Emit\nToken Metrics"]
+  METRIC --> RESP
+      </pre>
+    </div>
+
+    <pre><code><span class="comment">&lt;!-- Relevant APIM policy snippet (rawxml in apim.bicep) --&gt;</span>
+<span class="kw">&lt;authentication-managed-identity</span> resource=<span class="str">"https://cognitiveservices.azure.com"</span> <span class="kw">/&gt;</span>
+
+<span class="kw">&lt;azure-openai-semantic-caching-lookup</span>
+  score-threshold=<span class="str">"0.05"</span>
+  embeddings-backend-id=<span class="str">"openai-base"</span>
+  embeddings-backend-auth=<span class="str">"system-assigned"</span>
+  ignore-system-prompt=<span class="str">"false"</span>
+  max-message-count=<span class="str">"10"</span> <span class="kw">/&gt;</span>
+
+<span class="kw">&lt;azure-openai-token-limit</span>
+  tokens-per-minute=<span class="str">"500000"</span>
+  counter-key=<span class="str">"@(context.Subscription.Id)"</span>
+  estimate-prompt-tokens=<span class="str">"true"</span>
+  tokens-consumed-header-name=<span class="str">"x-tokens-consumed"</span> <span class="kw">/&gt;</span>
+
+<span class="kw">&lt;azure-openai-emit-token-metric</span> namespace=<span class="str">"PubHealthRfp"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;dimension</span> name=<span class="str">"consumer"</span>      value=<span class="str">"@(context.Subscription.Name)"</span> <span class="kw">/&gt;</span>
+  <span class="kw">&lt;dimension</span> name=<span class="str">"deployment"</span>    value=<span class="str">"@(context.Request.MatchedParameters[&quot;deploymentId&quot;])"</span> <span class="kw">/&gt;</span>
+  <span class="kw">&lt;dimension</span> name=<span class="str">"program_area"</span>  value=<span class="str">"@(context.Request.Headers.GetValueOrDefault(&quot;x-program-area&quot;,&quot;unknown&quot;))"</span> <span class="kw">/&gt;</span>
+<span class="kw">&lt;/azure-openai-emit-token-metric&gt;</span></code></pre>
+  </section>
+
+  <!-- ── Backend Pool ────────────────────────────────────────────────────────── -->
+  <section id="backend-pool">
+    <h2>Backend Pool &amp; Circuit Breaking</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Backend</th><th>Priority</th><th>Weight</th><th>Use Case</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono-cell">openai-finetuned</td>
+            <td class="right">1</td>
+            <td class="right">100</td>
+            <td>RFP section generation — domain-adapted on 50-RFP corpus</td>
+          </tr>
+          <tr>
+            <td class="mono-cell">openai-base</td>
+            <td class="right">2</td>
+            <td class="right">100</td>
+            <td>Fallback when fine-tuned endpoint throttles or returns 429</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>APIM automatically circuits to priority-2 on 429 or 503 from priority-1. The fine-tuned endpoint parameter (<code>openAiFineTunedEndpoint</code>) is optional — when empty, the pool contains only the base backend.</p>
+  </section>
+
+  <!-- ── Model Routing ────────────────────────────────────────────────────────── -->
+  <section id="model-routing">
+    <h2>Model Routing — Right-Sized Models per Task</h2>
+    <p>All inference routes through APIM. The gateway selects the backend based on the <code>deploymentId</code> path parameter — no application-layer routing logic required.</p>
+
+    <h3>Model assignment</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Task</th><th>Model</th><th>Rationale</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>RFP section generation</td>
+            <td><code>gpt-4o</code> (fine-tuned)</td>
+            <td>Creative, long-form drafting; fine-tuned on historical APHL RFPs for domain vocabulary and structure</td>
+          </tr>
+          <tr>
+            <td>Groundedness scoring</td>
+            <td><code>gpt-4o-mini</code></td>
+            <td>Structured 1–5 Likert rubric; ~15× cheaper than GPT-4o with equivalent accuracy on classification tasks</td>
+          </tr>
+          <tr>
+            <td>Coherence scoring</td>
+            <td><code>gpt-4o-mini</code></td>
+            <td>Same as groundedness — deterministic rubric, not creative reasoning</td>
+          </tr>
+          <tr>
+            <td>Parameter accuracy audit</td>
+            <td><code>o3-mini</code></td>
+            <td>Arithmetic comparison (requested amount vs. budget ceiling, duration vs. period limits); reasoning model catches edge cases instruction-following models miss</td>
+          </tr>
+          <tr>
+            <td>Budget audit</td>
+            <td><code>o3-mini</code></td>
+            <td>Multi-step budget narrative validation; benefits from chain-of-thought reasoning built into the model</td>
+          </tr>
+          <tr>
+            <td>Intent classification</td>
+            <td><code>gpt-4o-mini</code></td>
+            <td>Low-latency routing decision; single-label classification from a fixed taxonomy</td>
+          </tr>
+          <tr>
+            <td>Embeddings (retrieval)</td>
+            <td><code>text-embedding-3-large</code></td>
+            <td>1536-dim vectors; best recall on public health domain corpus in APHL benchmarks</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>APIM routing policy</h3>
+    <p>The <code>deploymentId</code> URL parameter is a matched route parameter in the APIM operation template <code>/deployments/{deploymentId}/chat/completions</code>. The policy reads it directly — no custom headers or application code changes needed.</p>
+    <pre><code><span class="comment">&lt;!-- apim.bicep — inbound policy (excerpt) --&gt;</span>
+&lt;choose&gt;
+  &lt;when condition=<span class="str">"@(new[]{&quot;gpt-4o-mini&quot;,&quot;o3-mini&quot;}.Contains(
+      context.Request.MatchedParameters.GetValueOrDefault(&quot;deploymentId&quot;,&quot;&quot;)))"</span>&gt;
+    &lt;<span class="kw">set-backend-service</span> backend-id=<span class="str">"openai-base"</span> /&gt;
+  &lt;/when&gt;
+  &lt;otherwise&gt;
+    &lt;<span class="kw">set-backend-service</span> backend-id=<span class="str">"openai-pool"</span> /&gt;
+  &lt;/otherwise&gt;
+&lt;/choose&gt;</code></pre>
+
+    <p>The <code>openai-pool</code> backend routes fine-tuned GPT-4o (priority 1) → base GPT-4o (priority 2) for generation. The <code>openai-base</code> backend routes mini and o3-mini directly — they are not fine-tuned and do not participate in the pool.</p>
+
+    <h3>Evaluator configuration</h3>
+    <p>The AI Evaluations SDK does not accept <code>DefaultAzureCredential</code> when the endpoint is APIM rather than a direct Azure OpenAI URL. Evaluators use an APIM subscription key (<code>AZURE_APIM_EVALUATION_KEY</code>); APIM authenticates onward to Azure OpenAI via its SystemAssigned managed identity — no OpenAI key is ever held by application code.</p>
+    <pre><code><span class="comment"># src/evaluation/evaluators/groundedness.py</span>
+model_config = {
+    <span class="str">"azure_endpoint"</span>:   os.getenv(<span class="str">"AZURE_APIM_GATEWAY_URL"</span>),
+    <span class="str">"azure_deployment"</span>: os.getenv(<span class="str">"AZURE_OPENAI_MINI_DEPLOYMENT"</span>, <span class="str">"gpt-4o-mini"</span>),
+    <span class="str">"api_version"</span>:      <span class="str">"2024-06-01"</span>,
+    <span class="str">"api_key"</span>:          os.getenv(<span class="str">"AZURE_APIM_EVALUATION_KEY"</span>),
+}
+evaluator = GroundednessEvaluator(model_config=model_config)</code></pre>
+
+    <h3>Estimated cost impact</h3>
+    <p>Eval gate runs on every generated RFP (~8 sections × 5 evaluators). Routing groundedness and coherence to gpt-4o-mini reduces evaluation cost by approximately <strong>93%</strong> vs. running all evaluation on GPT-4o, with no measurable change in gate accuracy on the APHL eval corpus.</p>
+
+    <h3>Section-tiered generation</h3>
+    <p>Not all 8 RFP sections require the fine-tuned GPT-4o. Three boilerplate sections — <code>reporting_requirements</code>, <code>budget_requirements</code>, and <code>submission_instructions</code> — contain templated, formula-driven content (CFR citations, portal deadlines, allowable cost lists) that gpt-4o-mini produces equivalently at ~15× lower cost. The remaining five sections (Background, Funding Parameters, Eligibility, Scope of Work, Evaluation Criteria) stay on the fine-tuned model where domain grounding matters.</p>
+    <p>The orchestrator registers both services in the Semantic Kernel and selects by section key:</p>
+    <pre><code><span class="comment">// RfpOrchestrationService.cs</span>
+<span class="kw">private static readonly</span> HashSet&lt;<span class="kw">string</span>&gt; MiniSections =
+[
+    SectionType.ReportingRequirements,
+    SectionType.BudgetRequirements,
+    SectionType.SubmissionInstructions,
+];
+
+<span class="kw">var</span> serviceId = MiniSections.Contains(sectionKey) ? <span class="str">"mini"</span> : <span class="str">"gpt4o"</span>;
+<span class="kw">var</span> chat = kernel.Services.GetKeyedService&lt;IChatCompletionService&gt;(serviceId);</code></pre>
+
+    <h3>Prompt caching</h3>
+    <p>All 8 section calls share the same system message: expert persona + RFP parameters + shared grounding context (retrieved once from AI Search before generation begins). By placing this stable content in the system message rather than the user message, Azure OpenAI's automatic prompt caching activates after section 1 — sections 2–8 pay ~50% on prompt tokens for the cached prefix. No code flag or API opt-in is required; caching fires when the prefix is byte-identical across calls.</p>
+    <pre><code><span class="comment">// System message is stable across all 8 section calls for this request.</span>
+<span class="comment">// Caching kicks in for sections 2–8 (identical prefix = cache hit, ~50% off prompt tokens).</span>
+<span class="kw">var</span> systemMessage = <span class="str">$"""
+    You are an expert public health laboratory grants writer ...
+
+    RFP PARAMETERS (authoritative — use exact values):
+    - Program Area: {request.ProgramArea}
+    ...
+
+    GROUNDING CONTEXT FROM SIMILAR RFPs:
+    {groundingContext}
+    """</span>;
+
+<span class="comment">// User message contains only the per-section variable content.</span>
+<span class="kw">var</span> userMessage = <span class="str">$"""
+    TASK: {sectionPrompt}
+    SECTION-SPECIFIC CORPUS EXCERPTS: {sectionContext}
+    """</span>;</code></pre>
+
+    <h3>Embedding model</h3>
+    <p>Retrieval uses <code>text-embedding-3-small</code> instead of <code>text-embedding-3-large</code> — 5× cheaper with ~3% quality difference on standard retrieval benchmarks. Benchmark against the full APHL corpus before upgrading to large in production if recall drops measurably.</p>
+  </section>
+
+  <!-- ── Agent Topology ─────────────────────────────────────────────────────── -->
+  <section id="agents">
+    <h2>Agent Topology — Azure AI Foundry Agent Service</h2>
+    <p>Multi-agent architecture using <code>AgentsClient</code> (azure-ai-projects SDK). The Coordinator agent routes to specialist agents based on intent classification.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+graph TD
+  C["Coordinator Agent"]
+  C --> GEN["RFP Generation"]
+  C --> REV["Proposal Review"]
+  C --> CLS["Classification"]
+  C --> REG["Regulatory Watch"]
+  C --> BUD["Budget Audit"]
+      </pre>
+    </div>
+
+    <h3>Agent initialization pattern</h3>
+    <pre><code><span class="kw">from</span> azure.ai.projects <span class="kw">import</span> AIProjectClient
+<span class="kw">from</span> azure.identity <span class="kw">import</span> DefaultAzureCredential
+
+client = AIProjectClient(
+    endpoint=os.environ[<span class="str">"AZURE_AI_FOUNDRY_PROJECT_ENDPOINT"</span>],
+    credential=DefaultAzureCredential()
+)
+
+agent = client.agents.create_agent(
+    model=<span class="str">"gpt-4o-finetuned"</span>,      <span class="comment"># fine-tuned deployment name</span>
+    name=<span class="str">"rfp-generation"</span>,
+    instructions=GENERATION_SYSTEM_PROMPT,
+    tools=search_tool_definitions,
+)</code></pre>
+  </section>
+
+  <!-- ── Fine-Tuning ─────────────────────────────────────────────────────────── -->
+  <section id="finetune">
+    <h2>Fine-Tuning Pipeline — AI Foundry</h2>
+    <p>GPT-4o domain adaptation on the 50-RFP public health corpus. Training data is formatted as supervised chat completions (system + user + assistant triplets, one per RFP section).</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TD
+  RAW["50 RFP\nDocuments"] --> PREP["Build\nJSONL"] --> UPLOAD["Upload to\nFoundry"] --> JOB["Fine-Tune\nJob"] --> DEPLOY["gpt-4o\nfinetuned"] --> APIM["APIM\nPriority 1"]
+      </pre>
+    </div>
+
+    <h3>Training file format</h3>
+    <pre><code><span class="comment">// Each line in train.jsonl — one per RFP section</span>
+{
+  <span class="str">"messages"</span>: [
+    { <span class="str">"role"</span>: <span class="str">"system"</span>,    <span class="str">"content"</span>: <span class="str">"You are an expert public health grants writer..."</span> },
+    { <span class="str">"role"</span>: <span class="str">"user"</span>,      <span class="str">"content"</span>: <span class="str">"Write the Scope of Work section for a 24-month influenza surveillance RFP..."</span> },
+    { <span class="str">"role"</span>: <span class="str">"assistant"</span>, <span class="str">"content"</span>: <span class="str">"## Scope of Work\n\nAwardees shall establish..."</span> }
+  ]
+}</code></pre>
+    <p>Key file: <code>src/training/prepare_finetune_data.py</code> — reads <code>data/sample-rfps/*.md</code>, splits by <code>## N. Heading</code> markers, produces 384 triplets: <code>data/training/train.jsonl</code> (307) and <code>data/training/val.jsonl</code> (77).</p>
+  </section>
+
+  <!-- ── Prompt Flow ─────────────────────────────────────────────────────────── -->
+  <section id="promptflow">
+    <h2>Prompt Flow DAG</h2>
+    <p>Managed Prompt Flow endpoint in AI Foundry. Four nodes run sequentially; the flow is called by the RFP Generation agent as a tool.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TD
+  IN["Input"] --> CLS["Classify\nProgram Area"] --> SRC["AI Search\ntop_k: 8"] --> GEN["Generate\n8 Sections"] --> EVAL["Evaluate\n5 Dimensions"] --> OUT["RfpDraft\n+ Scores"]
+      </pre>
+    </div>
+
+    <p>Key file: <code>src/promptflow/flow.dag.yaml</code> — defines node types, LLM connection names, and tool references. Deployed as a managed endpoint via <code>azd up</code> post-provision hook.</p>
+  </section>
+
+  <!-- ── Evaluation Gate ─────────────────────────────────────────────────────── -->
+  <section id="evaluation">
+    <h2>Evaluation Gate — 5 Dimensions</h2>
+    <p>All five evaluators run independently using the Azure AI Evaluations SDK (<code>azure-ai-evaluation</code>). A draft must pass all five to proceed to SharePoint. Individual failures return dimension-level failure reasons.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Dimension</th><th>Evaluator Type</th><th>Pass Threshold</th><th>What It Checks</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Groundedness</strong></td>
+            <td>AI-assisted (GPT-4o judge)</td>
+            <td class="right">≥ 0.80</td>
+            <td>All factual claims traceable to retrieved corpus chunks</td>
+          </tr>
+          <tr>
+            <td><strong>Completeness</strong></td>
+            <td>AI-assisted (GPT-4o judge)</td>
+            <td class="right">≥ 0.80</td>
+            <td>All 8 required sections present and substantive</td>
+          </tr>
+          <tr>
+            <td><strong>Parameter Accuracy</strong></td>
+            <td>Rule-based (exact match)</td>
+            <td class="right">1.00</td>
+            <td>Amount, period, sponsor, cost-share match request parameters</td>
+          </tr>
+          <tr>
+            <td><strong>Compliance</strong></td>
+            <td>Rule-based (phrase match)</td>
+            <td class="right">≥ 0.80</td>
+            <td>Required compliance phrases present; prohibited terms absent</td>
+          </tr>
+          <tr>
+            <td><strong>Coherence</strong></td>
+            <td>AI-assisted (GPT-4o judge)</td>
+            <td class="right">≥ 0.75</td>
+            <td>Logical flow, consistent terminology, no internal contradictions</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Evaluation SDK pattern</h3>
+    <pre><code><span class="kw">from</span> azure.ai.evaluation <span class="kw">import</span> GroundednessEvaluator, evaluate
+
+results = evaluate(
+    data=eval_pairs_path,
+    evaluators={
+        <span class="str">"groundedness"</span>: GroundednessEvaluator(model_config),
+        <span class="str">"completeness"</span>: CompletenessEvaluator(model_config),
+        <span class="str">"parameter_accuracy"</span>: ParameterAccuracyEvaluator(),
+        <span class="str">"compliance"</span>: ComplianceEvaluator(phrase_list=REQUIRED_PHRASES),
+        <span class="str">"coherence"</span>: CoherenceEvaluator(model_config),
+    },
+    azure_ai_project=project_config,
+    output_path=<span class="str">"data/golden-dataset/eval_pairs.jsonl"</span>,
+)</code></pre>
+
+    <p>Key files: <code>src/evaluation/gate.py</code>, <code>src/evaluation/groundedness.py</code>, <code>src/evaluation/completeness.py</code>, <code>src/evaluation/parameter_accuracy.py</code>, <code>src/evaluation/compliance.py</code>, <code>src/evaluation/coherence.py</code>, <code>src/golden/annotator_cli.py</code>, <code>src/golden/eval_pairs.py</code>.</p>
+  </section>
+
+  <!-- ── Content Safety ─────────────────────────────────────────────────────── -->
+  <section id="content-safety">
+    <h2>Content Safety</h2>
+    <p>Azure AI Content Safety is called on all inbound user requests before generation begins. Blocks PII, harmful content, and select-agent references. Integrated in FastAPI lifespan via <code>ContentSafetyClient(DefaultAzureCredential())</code>.</p>
+    <div class="callout red">
+      <strong>Select agent handling:</strong> The compliance evaluator includes a rule that rejects any draft containing select-agent pathogen names in a non-regulatory context. This is a defense-in-depth layer on top of Content Safety — both must pass.
+    </div>
+  </section>
+
+  <!-- ── AI Search ───────────────────────────────────────────────────────────── -->
+  <section id="search">
+    <h2>AI Search Index</h2>
+    <p>Index name: <code>pubhealth-rfp-index</code>. HNSW vector fields on <code>content_vector</code> (text-embedding-3-large, 3072 dims) + keyword BM25 on <code>content</code>. Semantic ranker config: <code>pubhealth-rfp-semantic</code>.</p>
+
+    <h3>Index schema (key fields)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono-cell">id</td><td>String (key)</td><td>SHA-256 of (rfp_id + chunk_index)</td></tr>
+          <tr><td class="mono-cell">rfp_id</td><td>String (filterable)</td><td>e.g. <code>RFP-2024-FLU-027</code></td></tr>
+          <tr><td class="mono-cell">section_type</td><td>String (filterable)</td><td><code>background | funding | eligibility | scope | reporting | budget | evaluation | submission</code></td></tr>
+          <tr><td class="mono-cell">program_area</td><td>String (filterable)</td><td>Taxonomy classification</td></tr>
+          <tr><td class="mono-cell">sponsor</td><td>String (filterable)</td><td>CDC, HRSA, HHS, etc.</td></tr>
+          <tr><td class="mono-cell">content</td><td>String (searchable)</td><td>Raw chunk text — BM25 keyword search</td></tr>
+          <tr><td class="mono-cell">content_vector</td><td>Collection(Single) 3072</td><td>HNSW; embedded with text-embedding-3-large</td></tr>
+          <tr><td class="mono-cell">amount_usd</td><td>Int64 (filterable)</td><td>Total award amount for parameter matching</td></tr>
+          <tr><td class="mono-cell">performance_period_months</td><td>Int32 (filterable)</td><td>Duration in months</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── SharePoint ──────────────────────────────────────────────────────────── -->
+  <section id="sharepoint">
+    <h2>SharePoint Integration</h2>
+    <p>Two SharePoint document libraries accessed via Microsoft Graph API with <code>DefaultAzureCredential</code>. The managed identity must have <code>Sites.Read.All</code> (corpus) and <code>Sites.ReadWrite.All</code> (drafts).</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Library</th><th>Direction</th><th>Schedule</th><th>Handler</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>RFP Corpus</strong></td>
+            <td>Inbound → AI Search</td>
+            <td>Fabric Pipeline, nightly</td>
+            <td><code>src/fabric/sharepoint_ingestion.py</code></td>
+          </tr>
+          <tr>
+            <td><strong>Generated Drafts</strong></td>
+            <td>Outbound ← Evaluation Gate</td>
+            <td>On demand (per generation)</td>
+            <td><code>src/api/sharepoint_client.py</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Key env vars: <code>SHAREPOINT_SITE_ID</code>, <code>SHAREPOINT_LIBRARY</code>, <code>SHAREPOINT_DRAFT_LIBRARY</code>. Site ID obtained via Graph API: <code>GET /sites/{hostname}:/{path}</code>.</p>
+
+    <h3>Word (.docx) output</h3>
+    <p>Gate-passing drafts are written as Word documents rather than Markdown, so program officers can edit them directly in SharePoint/Office Online without downloading. The <code>python-docx</code> library assembles the 8 sections with Word styles (Heading 0 cover title, Heading 1 per section, Normal body text). Content type on upload: <code>application/vnd.openxmlformats-officedocument.wordprocessingml.document</code>.</p>
+    <pre><code><span class="comment"># sharepoint_client.py</span>
+<span class="kw">async def</span> upload_draft_docx(self, library_name, rfp_id, draft_id, sections, folder=<span class="str">"GeneratedDrafts"</span>):
+    docx_bytes = SharePointClient.draft_to_docx(rfp_id, sections)  <span class="comment"># python-docx → bytes</span>
+    file_name = f<span class="str">"{rfp_id}_{draft_id}.docx"</span>
+    <span class="comment"># PUT to Graph API with Word content-type; returns webUrl for the Teams card button</span></code></pre>
+  </section>
+
+  <!-- ── Fabric / OneLake ────────────────────────────────────────────────────── -->
+  <section id="fabric">
+    <h2>Microsoft Fabric / OneLake</h2>
+    <p>Fabric Lakehouse (<code>FABRIC_LAKEHOUSE_ID</code>) holds 6 Delta tables auto-discovered by a Power BI semantic model. The Fabric AI Skill wraps the AI Search index for natural-language querying within Fabric notebooks.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Delta Table</th><th>Source</th><th>Key Columns</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono-cell">eval_results</td><td>Evaluation gate output</td><td>draft_id, program_area, all 5 dimension scores, gate_pass, timestamp</td></tr>
+          <tr><td class="mono-cell">pass_rates_by_program</td><td>Aggregated eval_results</td><td>program_area, pass_rate, total_count, period</td></tr>
+          <tr><td class="mono-cell">score_distributions</td><td>Aggregated eval_results</td><td>dimension, p10, p25, p50, p75, p90 percentiles</td></tr>
+          <tr><td class="mono-cell">gate_confusion</td><td>eval_results + annotations</td><td>program_area, TP, TN, FP, FN, false_positive_rate</td></tr>
+          <tr><td class="mono-cell">calibration_summary</td><td>eval_pairs.jsonl</td><td>dimension, MAE, bias_direction, human_AI_agreement</td></tr>
+          <tr><td class="mono-cell">eval_timeline</td><td>eval_results time-series</td><td>date, total_runs, pass_count, avg_score per dimension</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Key file: <code>fabric/eval_analytics.ipynb</code> — PySpark notebook that reads <code>eval_pairs.jsonl</code> from OneLake root and writes all 6 tables.</p>
+  </section>
+
+  <!-- ── Observability ───────────────────────────────────────────────────────── -->
+  <section id="observability">
+    <h2>Observability</h2>
+    <p>OpenTelemetry traces shipped to Azure Monitor via <code>APPLICATIONINSIGHTS_CONNECTION_STRING</code>. Custom span attribute namespaces: <code>gen_ai.*</code> (AI Foundry built-in), <code>rag.*</code>, <code>eval.*</code>, <code>pubhealth.*</code>.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Span Attribute</th><th>Example Value</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono-cell">gen_ai.system</td><td>azure.openai</td><td>AI Foundry OTel built-in</td></tr>
+          <tr><td class="mono-cell">gen_ai.request.model</td><td>gpt-4o-finetuned</td><td>Which deployment served the request</td></tr>
+          <tr><td class="mono-cell">gen_ai.usage.prompt_tokens</td><td>1842</td><td>Token cost tracking</td></tr>
+          <tr><td class="mono-cell">rag.retrieval.query</td><td>"influenza surveillance scope"</td><td>Search query for debugging retrieval</td></tr>
+          <tr><td class="mono-cell">rag.retrieval.top_k</td><td>8</td><td>Chunks returned</td></tr>
+          <tr><td class="mono-cell">rag.retrieval.score_top1</td><td>0.923</td><td>Top similarity score for relevance monitoring</td></tr>
+          <tr><td class="mono-cell">eval.dimension</td><td>groundedness</td><td>Which evaluator dimension</td></tr>
+          <tr><td class="mono-cell">eval.score</td><td>0.91</td><td>Raw evaluator score</td></tr>
+          <tr><td class="mono-cell">eval.pass</td><td>true</td><td>Gate pass/fail per dimension</td></tr>
+          <tr><td class="mono-cell">pubhealth.program_area</td><td>influenza_surveillance</td><td>Program area for segmented dashboards</td></tr>
+          <tr><td class="mono-cell">pubhealth.rfp_id</td><td>RFP-2024-FLU-027</td><td>End-to-end trace correlation</td></tr>
+          <tr><td class="mono-cell">pubhealth.sponsor</td><td>CDC</td><td>Funding sponsor dimension</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Key file: <code>src/api/observability.py</code> — <code>get_tracer()</code> helper + span attribute constants. <code>src/api/budget_monitor.py</code> — polls APIM token-metric and raises alert at 80% / 95% of <code>MONTHLY_BUDGET_USD</code>.</p>
+  </section>
+
+  <!-- ── Container Apps ─────────────────────────────────────────────────────── -->
+  <section id="container-apps">
+    <h2>Container Apps Deployment</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>App</th><th>Image</th><th>Port</th><th>vCPU / Memory</th><th>Min / Max Replicas</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>FastAPI + Bot Handler</strong></td>
+            <td><code>pubhealth-api</code></td>
+            <td>8000</td>
+            <td>0.5 / 1 Gi</td>
+            <td>0 / 3</td>
+          </tr>
+          <tr>
+            <td><strong>SK Orchestrator (.NET)</strong></td>
+            <td><code>pubhealth-orchestrator</code></td>
+            <td>5001</td>
+            <td>0.5 / 1 Gi</td>
+            <td>0 / 3</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Both apps share the same user-assigned managed identity. Scale-to-zero enabled — idle cost is $0 during off-hours. Ingress is external (HTTPS) for the API app; orchestrator is internal-only.</p>
+  </section>
+
+  <!-- ── Bicep Modules ───────────────────────────────────────────────────────── -->
+  <section id="bicep">
+    <h2>Bicep Module Inventory</h2>
+    <p>Subscription-scope <code>infra/main.bicep</code> orchestrates 11 resource-group–scope modules. Provision with <code>azd up</code>.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Module</th><th>Resource Type</th><th>SKU / Tier</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono-cell">identity.bicep</td><td>User-Assigned Managed Identity + role assignments</td><td>—</td></tr>
+          <tr><td class="mono-cell">storage.bicep</td><td>Storage Account</td><td>Standard_LRS</td></tr>
+          <tr><td class="mono-cell">openai.bicep</td><td>Azure OpenAI (GPT-4o + text-embedding-3-large)</td><td>S0</td></tr>
+          <tr><td class="mono-cell">ai-search.bicep</td><td>Azure AI Search</td><td>S1 (POC: Basic)</td></tr>
+          <tr><td class="mono-cell">monitoring.bicep</td><td>Log Analytics Workspace + Application Insights</td><td>PerGB2018</td></tr>
+          <tr><td class="mono-cell">keyvault.bicep</td><td>Key Vault (APIM subscription keys)</td><td>Standard</td></tr>
+          <tr><td class="mono-cell">doc-intelligence.bicep</td><td>Azure Document Intelligence (PDF parsing)</td><td>S0</td></tr>
+          <tr><td class="mono-cell">ai-foundry.bicep</td><td>AI Foundry Hub + Project</td><td>Standard</td></tr>
+          <tr><td class="mono-cell">container-apps.bicep</td><td>Container Apps Environment + 2 apps</td><td>Consumption</td></tr>
+          <tr><td class="mono-cell">budget.bicep</td><td>Azure Budget + alert action group</td><td>—</td></tr>
+          <tr><td class="mono-cell">apim.bicep</td><td>API Management + AI Gateway policies</td><td>Consumption</td></tr>
+          <tr><td class="mono-cell">bot-service.bicep</td><td>Azure Bot Service + Teams Channel</td><td>F0 (free)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Notable Bicep constraint</h3>
+    <div class="callout amber">
+      <strong>utcNow() must be a parameter default value, not a var.</strong> <code>budget.bicep</code> uses <code>param utcValue string = utcNow('yyyy-MM-dd')</code> and derives <code>var startDate = '${'{substring(utcValue, 0, 7)}'}-01'</code>. Moving utcNow() into a var triggers BCP065.
+    </div>
+  </section>
+
+  <!-- ── Cost Estimate ──────────────────────────────────────────────────────── -->
+  <section id="cost">
+    <h2>Cost Estimate</h2>
+    <p>POC uses free/trial tiers. Production removes free tiers and sizes for operational SLAs. All prices USD, East US, August 2025 list pricing.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>POC SKU</th>
+            <th class="right">POC Mo.</th>
+            <th>Prod SKU</th>
+            <th class="right">Prod Mo.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GPT-4o generation (50 RFPs/mo)</td>
+            <td>Pay-as-you-go</td>
+            <td class="right">$50–80</td>
+            <td>Pay-as-you-go</td>
+            <td class="right">$150–250</td>
+          </tr>
+          <tr>
+            <td>GPT-4o evaluation (5×50 runs)</td>
+            <td>Pay-as-you-go</td>
+            <td class="right">$50–90</td>
+            <td>Pay-as-you-go</td>
+            <td class="right">$130–210</td>
+          </tr>
+          <tr>
+            <td>Azure AI Search</td>
+            <td>Basic ($73.73)</td>
+            <td class="right">$74</td>
+            <td>S1 ($250.34)</td>
+            <td class="right">$250</td>
+          </tr>
+          <tr>
+            <td>API Management</td>
+            <td>Consumption (first 1M free)</td>
+            <td class="right">$0–5</td>
+            <td>Consumption</td>
+            <td class="right">$49</td>
+          </tr>
+          <tr>
+            <td>Container Apps</td>
+            <td>Consumption</td>
+            <td class="right">$20–40</td>
+            <td>Dedicated D4</td>
+            <td class="right">$40–120</td>
+          </tr>
+          <tr>
+            <td>Microsoft Fabric</td>
+            <td>60-day trial</td>
+            <td class="right">$0</td>
+            <td>F2 capacity (~$0.36/CU/hr)</td>
+            <td class="right">$400–530</td>
+          </tr>
+          <tr>
+            <td>Azure Monitor + Storage</td>
+            <td>5 GB free</td>
+            <td class="right">$15–25</td>
+            <td>~15 GB/mo</td>
+            <td class="right">$40–105</td>
+          </tr>
+          <tr>
+            <td>Azure Bot Service</td>
+            <td>F0 (free)</td>
+            <td class="right">$0</td>
+            <td>S1 ($10/mo base)</td>
+            <td class="right">$10–30</td>
+          </tr>
+          <tr>
+            <td>Document Intelligence, Key Vault, misc.</td>
+            <td>Free tier / S0</td>
+            <td class="right">$0–5</td>
+            <td>S0</td>
+            <td class="right">$6–30</td>
+          </tr>
+          <tr class="total-row">
+            <td><strong>Total</strong></td>
+            <td></td>
+            <td class="right"><strong>$215–320</strong></td>
+            <td></td>
+            <td class="right"><strong>$1,075–2,275</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout amber">
+      <strong>Fabric F2 is the dominant production cost.</strong> Deferring Fabric and using Azure Synapse Analytics serverless (~$5/TB queried) or Power BI PPU ($20/user/mo) saves $400–530/month. Recommended until generation volume justifies dedicated capacity.
+    </div>
+    <div class="callout info">
+      <strong>PTU breakeven:</strong> At ~300K tokens/day GPT-4o generation, a PTU reservation becomes cheaper than pay-as-you-go. Below that threshold, pay-as-you-go is lower cost.
+    </div>
+  </section>
+
+  <!-- ── Implementation Phases ─────────────────────────────────────────────── -->
+  <section id="phases">
+    <h2>Implementation Phases</h2>
+    <div class="phase-grid">
+      <div class="phase-block">
+        <h3>Phase 1 — Infrastructure + Corpus (Week 1)</h3>
+        <ul>
+          <li><code>azd up</code> — provision all 12 Bicep modules</li>
+          <li>Run <code>src/ingestion/pipeline.py</code> to ingest 50-RFP corpus into AI Search</li>
+          <li>Smoke test <code>/search</code> and <code>/health</code> endpoints</li>
+          <li>Validate APIM gateway routes and token metric in Application Insights</li>
+        </ul>
+      </div>
+      <div class="phase-block">
+        <h3>Phase 2 — Fine-Tuning + Evaluation (Week 2)</h3>
+        <ul>
+          <li>Run <code>src/training/prepare_finetune_data.py</code> to produce JSONL training files</li>
+          <li>Submit fine-tuning job via AI Foundry; register deployment as <code>gpt-4o-finetuned</code></li>
+          <li>Register fine-tuned endpoint in APIM backend pool</li>
+          <li>Run <code>src/golden/annotator_cli.py</code> to annotate 20+ eval pairs</li>
+          <li>Run <code>src/evaluation/run_eval.py</code> against eval pairs; review calibration report</li>
+        </ul>
+      </div>
+      <div class="phase-block">
+        <h3>Phase 3 — Generation + Prompt Flow (Week 3)</h3>
+        <ul>
+          <li>✓ <code>src/promptflow/flow.dag.yaml</code> — 4-node DAG implemented (classify → search → generate → evaluate)</li>
+          <li>Deploy Prompt Flow as managed endpoint via <code>azd up</code> post-provision hook</li>
+          <li>Implement and test <code>/generate</code> and <code>/evaluate</code> FastAPI endpoints</li>
+          <li>Wire evaluation gate; verify gate pass/fail routing to SharePoint</li>
+          <li>Run end-to-end generation smoke test for 3 program areas</li>
+        </ul>
+      </div>
+      <div class="phase-block">
+        <h3>Phase 4 — Agents + Teams Bot (Week 4)</h3>
+        <ul>
+          <li>✓ Coordinator + 5 specialist agents implemented in <code>src/agents/</code></li>
+          <li>Implement <code>src/bot/bot.py</code> ActivityHandler and Adaptive Cards</li>
+          <li>Set bot messaging endpoint: <code>azd env set botMessagingEndpoint &lt;api-url&gt;/api/messages</code></li>
+          <li>Sideload Teams app manifest; test end-to-end in Teams client</li>
+        </ul>
+      </div>
+      <div class="phase-block">
+        <h3>Phase 5 — Analytics + Hardening (Week 5)</h3>
+        <ul>
+          <li>Run <code>fabric/eval_analytics.ipynb</code>; verify 6 Delta tables in OneLake</li>
+          <li>Publish Power BI semantic model and eval dashboard</li>
+          <li>Load test at 10× expected volume; verify APIM token limits and circuit breaking</li>
+          <li>Review budget monitor alerts at 80% and 95% thresholds</li>
+          <li>Security review: verify no credentials in code, DefaultAzureCredential everywhere</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose', fontSize: 16 });
+</script>
