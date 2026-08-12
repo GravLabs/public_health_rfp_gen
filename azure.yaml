@@ -19,7 +19,13 @@ services:
 
 hooks:
   postprovision:
-    shell: sh
-    run: scripts/post-provision.sh
-    interactive: true
-    continueOnError: false
+    posix:
+      shell: sh
+      run: scripts/post-provision.sh
+      interactive: true
+      continueOnError: false
+    windows:
+      shell: pwsh
+      run: scripts/post-provision.ps1
+      interactive: true
+      continueOnError: false
