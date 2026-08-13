@@ -209,6 +209,31 @@ Token limiting, semantic caching, and token metric emission are not available in
 
 ---
 
+## Teardown
+
+To delete all Azure resources cleanly (purges soft-deleted Key Vault and Cognitive Services so the next `azd up` starts fresh):
+
+```bash
+# Linux/macOS
+./scripts/teardown.sh
+
+# Windows (PowerShell)
+.\scripts\teardown.ps1
+```
+
+The script runs `azd down --force --purge`, purges any remaining soft-deleted Cognitive Services accounts (OpenAI, Document Intelligence), and optionally removes the local `.azure/<env>` state directory.
+
+> **Note:** After teardown, re-create the environment before redeploying:
+> ```bash
+> azd env new <env-name>
+> azd env set AZURE_LOCATION eastus
+> azd env set APIM_PUBLISHER_EMAIL your@email.com
+> azd env set OWNER_EMAIL your@email.com
+> azd up
+> ```
+
+---
+
 ## Local Development
 
 After `azd up` completes, `.env` is written to the project root. Use it for local runs.
