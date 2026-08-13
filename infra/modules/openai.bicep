@@ -58,10 +58,10 @@ resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
 
 // Grant managed identity Cognitive Services OpenAI User
 resource openAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(openAi.id, identityPrincipalId, '5e0bd9bd-7b93-4f28-af87-19fc36ad1654')
+  name: guid(openAi.id, identityPrincipalId, 'a97b65f3-24c7-4388-baec-2e87135dc908')
   scope: openAi
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad1654')
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908')
     principalId: identityPrincipalId
     principalType: 'ServicePrincipal'
   }

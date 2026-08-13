@@ -124,8 +124,6 @@ module aiFoundry 'modules/ai-foundry.bicep' = {
     location: location
     tags: tags
     identityPrincipalId: identity.outputs.principalId
-    openAiResourceId: openAi.outputs.resourceId
-    searchResourceId: search.outputs.resourceId
     storageResourceId: storage.outputs.resourceId
     keyVaultResourceId: keyVault.outputs.resourceId
     appInsightsResourceId: monitoring.outputs.appInsightsId

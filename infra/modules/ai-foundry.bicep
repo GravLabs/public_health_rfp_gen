@@ -3,8 +3,6 @@ param projectName string
 param location string
 param tags object = {}
 param identityPrincipalId string
-param openAiResourceId string
-param searchResourceId string
 param storageResourceId string
 param keyVaultResourceId string
 param appInsightsResourceId string
@@ -38,34 +36,6 @@ resource project 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
   properties: {
     hubResourceId: hub.id
     publicNetworkAccess: 'Enabled'
-  }
-}
-
-// Connect Azure OpenAI to the Hub
-resource openAiConnection 'Microsoft.MachineLearningServices/workspaces/connections@2024-04-01' = {
-  parent: hub
-  name: 'azure-openai'
-  properties: {
-    category: 'AzureOpenAI'
-    target: 'https://${split(openAiResourceId, '/')[8]}.openai.azure.com'
-    authType: 'ManagedIdentity'
-    metadata: {
-      ResourceId: openAiResourceId
-    }
-  }
-}
-
-// Connect AI Search to the Hub
-resource searchConnection 'Microsoft.MachineLearningServices/workspaces/connections@2024-04-01' = {
-  parent: hub
-  name: 'azure-ai-search'
-  properties: {
-    category: 'CognitiveSearch'
-    target: 'https://${split(searchResourceId, '/')[8]}.search.windows.net'
-    authType: 'ManagedIdentity'
-    metadata: {
-      ResourceId: searchResourceId
-    }
   }
 }
 
