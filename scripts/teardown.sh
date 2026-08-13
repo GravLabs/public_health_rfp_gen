@@ -8,7 +8,7 @@ echo ""
 
 # Confirm before destroying
 read -r -p "This will DELETE all Azure resources. Type 'yes' to continue: " confirm
-if [ "$confirm" != "yes" ]; then
+if [ "$confirm" != "yes" ] && [ "$confirm" != "y" ]; then
   echo "Aborted."
   exit 0
 fi
