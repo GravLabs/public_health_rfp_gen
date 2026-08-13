@@ -12,29 +12,41 @@ FOUNDRY_PROJECT=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_NAME 2>/dev/null ||
 CONTAINER="rfp-corpus"
 
 echo ""
-echo "[1/6] Uploading 50 sample RFPs to blob storage: ${ACCOUNT}/${CONTAINER}"
-az storage blob upload-batch \
-  --account-name "$ACCOUNT" \
-  --destination "$CONTAINER" \
-  --source "data/sample-rfps" \
-  --pattern "*.md" \
-  --auth-mode login \
-  --overwrite
+echo "[1/6] Uploading sample RFPs to blob storage: ${ACCOUNT}/${CONTAINER}"
+if [ -d "data/sample-rfps" ]; then
+  az storage blob upload-batch \
+    --account-name "$ACCOUNT" \
+    --destination "$CONTAINER" \
+    --source "data/sample-rfps" \
+    --pattern "*.md" \
+    --auth-mode key \
+    --overwrite
+else
+  echo "      ⚠ data/sample-rfps not found — skipping (add .md files there to populate)"
+fi
 
-echo "[2/6] Uploading 20 eval examples to golden-dataset container"
-az storage blob upload-batch \
-  --account-name "$ACCOUNT" \
-  --destination "golden-dataset" \
-  --source "data/eval-examples" \
-  --pattern "*.json" \
-  --auth-mode login \
-  --overwrite
+echo "[2/6] Uploading eval examples to golden-dataset container"
+if [ -d "data/eval-examples" ]; then
+  az storage blob upload-batch \
+    --account-name "$ACCOUNT" \
+    --destination "golden-dataset" \
+    --source "data/eval-examples" \
+    --pattern "*.json" \
+    --auth-mode key \
+    --overwrite
+else
+  echo "      ⚠ data/eval-examples not found — skipping (add .json files there to populate)"
+fi
 
 echo "[3/6] Creating AI Search index and running ingestion pipeline"
-export AZURE_SEARCH_ENDPOINT="$SEARCH_ENDPOINT"
-export AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT"
-python3 src/ingestion/create_index.py
-python3 src/ingestion/pipeline.py
+if [ -f "src/ingestion/create_index.py" ]; then
+  export AZURE_SEARCH_ENDPOINT="$SEARCH_ENDPOINT"
+  export AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT"
+  python3 src/ingestion/create_index.py
+  python3 src/ingestion/pipeline.py
+else
+  echo "      ⚠ src/ingestion/create_index.py not found — skipping ingestion"
+fi
 
 echo "[4/6] Setting up AI Foundry connections"
 if [ -n "$FOUNDRY_PROJECT" ]; then
