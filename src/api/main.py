@@ -22,6 +22,7 @@ from botbuilder.schema import Activity
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Query, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from bot import RfpBotHandler
 from models import (
     RfpRequest, RfpDraft, EvaluationResult, GenerateAndEvaluateResponse,
     EvaluatorScores, GateDecision, HealthResponse, TokenUsage
@@ -345,9 +346,6 @@ async def foundry_info():
 @app.post("/api/messages", summary="Teams Bot webhook")
 async def messages(req: Request) -> Response:
     """Bot Framework webhook — receives all Teams channel activities."""
-    import sys
-    sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent / "bot"))
-    from bot import RfpBotHandler
     body = await req.json()
     activity = Activity().deserialize(body)
     auth_header = req.headers.get("Authorization", "")

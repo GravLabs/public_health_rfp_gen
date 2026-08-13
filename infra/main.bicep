@@ -10,7 +10,7 @@ param apimPublisherEmail string = 'admin@example.com'
 param ownerEmail string = 'owner@example.com'
 param openAiModelName string = 'gpt-4o'
 param openAiModelVersion string = '2024-08-06'
-param embeddingModelName string = 'text-embedding-3-large'
+param embeddingModelName string = 'text-embedding-3-small'
 param searchSkuName string = 'basic'
 param budgetAmountUsd int = 500
 param botMessagingEndpoint string = 'https://placeholder.example.com/api/messages'
@@ -160,20 +160,18 @@ module apim 'modules/apim.bicep' = {
   }
 }
 
-// Teams Bot — deferred: bot was left in a conflicting ARM state from a prior partial run.
-// Re-enable once portal cleanup is done or the resource group is recreated fresh.
-// module botService 'modules/bot-service.bicep' = {
-//   name: 'botService'
-//   scope: rg
-//   params: {
-//     name: 'bot-pubhealth-rfp-${resourceToken}'
-//     tags: tags
-//     messagingEndpoint: botMessagingEndpoint
-//     microsoftAppId: identity.outputs.clientId
-//     tenantId: tenant().tenantId
-//     identityResourceId: identity.outputs.identityId
-//   }
-// }
+module botService 'modules/bot-service.bicep' = {
+  name: 'botService'
+  scope: rg
+  params: {
+    name: 'bot-pubhealth-rfp-${resourceToken}'
+    tags: tags
+    messagingEndpoint: botMessagingEndpoint
+    microsoftAppId: identity.outputs.clientId
+    tenantId: tenant().tenantId
+    identityResourceId: identity.outputs.identityId
+  }
+}
 
 // Azure Budget Alert ($500/mo)
 module budget 'modules/budget.bicep' = {
@@ -211,4 +209,4 @@ output AZURE_APIM_NAME string = apim.outputs.apimName
 
 output AZURE_AI_FOUNDRY_PROJECT_ENDPOINT string = aiFoundry.outputs.projectEndpoint
 
-// output AZURE_BOT_NAME string = botService.outputs.botName  // deferred with botService module
+output AZURE_BOT_NAME string = botService.outputs.botName

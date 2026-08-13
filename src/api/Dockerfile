@@ -2,12 +2,13 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+# Build context is src/ so we can include both api/ and bot/
+COPY api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY api/ .
+COPY bot/bot.py .
 
-# Use managed identity in Container Apps — no secrets needed
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000

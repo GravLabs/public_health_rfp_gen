@@ -12,12 +12,26 @@ services:
     project: src/api
     language: python
     host: containerapp
+    docker:
+      context: src
+      path: api/Dockerfile
   orchestrator:
     project: src/orchestrator
     language: dotnet
     host: containerapp
 
 hooks:
+  postdeploy:
+    posix:
+      shell: sh
+      run: scripts/post-deploy.sh
+      interactive: true
+      continueOnError: true
+    windows:
+      shell: pwsh
+      run: scripts/post-deploy.ps1
+      interactive: true
+      continueOnError: true
   postprovision:
     posix:
       shell: sh
