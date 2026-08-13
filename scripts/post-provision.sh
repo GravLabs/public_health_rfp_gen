@@ -44,7 +44,7 @@ if [ -f "src/ingestion/create_index.py" ]; then
   export AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT"
   export AZURE_STORAGE_ACCOUNT="$ACCOUNT"
   echo "      Installing ingestion dependencies..."
-  python3 -m venv /tmp/aphl-ingest-venv --quiet
+  python3 -m venv /tmp/aphl-ingest-venv
   /tmp/aphl-ingest-venv/bin/pip install -r src/ingestion/requirements.txt --quiet
   /tmp/aphl-ingest-venv/bin/python3 src/ingestion/create_index.py
   # pipeline.py imports local siblings (document_parser, chunker, indexer)
