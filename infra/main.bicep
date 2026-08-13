@@ -160,19 +160,20 @@ module apim 'modules/apim.bicep' = {
   }
 }
 
-// Teams Bot — channels registration + Teams channel
-module botService 'modules/bot-service.bicep' = {
-  name: 'botService'
-  scope: rg
-  params: {
-    name: 'bot-pubhealth-rfp-${resourceToken}'
-    tags: tags
-    messagingEndpoint: botMessagingEndpoint
-    microsoftAppId: identity.outputs.clientId
-    tenantId: tenant().tenantId
-    identityResourceId: identity.outputs.identityId
-  }
-}
+// Teams Bot — deferred: bot was left in a conflicting ARM state from a prior partial run.
+// Re-enable once portal cleanup is done or the resource group is recreated fresh.
+// module botService 'modules/bot-service.bicep' = {
+//   name: 'botService'
+//   scope: rg
+//   params: {
+//     name: 'bot-pubhealth-rfp-${resourceToken}'
+//     tags: tags
+//     messagingEndpoint: botMessagingEndpoint
+//     microsoftAppId: identity.outputs.clientId
+//     tenantId: tenant().tenantId
+//     identityResourceId: identity.outputs.identityId
+//   }
+// }
 
 // Azure Budget Alert ($500/mo)
 module budget 'modules/budget.bicep' = {
@@ -210,4 +211,4 @@ output AZURE_APIM_NAME string = apim.outputs.apimName
 
 output AZURE_AI_FOUNDRY_PROJECT_ENDPOINT string = aiFoundry.outputs.projectEndpoint
 
-output AZURE_BOT_NAME string = botService.outputs.botName
+// output AZURE_BOT_NAME string = botService.outputs.botName  // deferred with botService module
