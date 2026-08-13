@@ -70,7 +70,7 @@ resource miniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-1
     model: {
       format: 'OpenAI'
       name: 'gpt-4o-mini'
-      version: '2024-07-18'
+      version: '2025-01-01'
     }
   }
 }
@@ -82,7 +82,7 @@ resource o3MiniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024
   name: 'o3-mini'
   dependsOn: [miniDeployment]
   sku: {
-    name: 'GlobalStandard'
+    name: 'Standard'
     capacity: 10
   }
   properties: {
