@@ -36,6 +36,7 @@ resource botService 'Microsoft.BotService/botServices@2022-09-15' = {
 resource teamsChannel 'Microsoft.BotService/botServices/channels@2022-09-15' = {
   parent: botService
   name: 'MsTeamsChannel'
+  location: 'global'
   properties: {
     channelName: 'MsTeamsChannel'
     properties: {
