@@ -172,6 +172,7 @@ module botService 'modules/bot-service.bicep' = {
     messagingEndpoint: botMessagingEndpoint
     microsoftAppId: identity.outputs.clientId
     tenantId: tenant().tenantId
+    identityResourceId: identity.outputs.identityId
   }
 }
 

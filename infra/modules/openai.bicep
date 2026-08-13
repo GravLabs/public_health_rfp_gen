@@ -23,11 +23,11 @@ resource openAi 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
 }
 
-resource gptDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-10-01-preview' = {
+resource gptDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: openAi
   name: gptModelName
   sku: {
-    name: 'Standard'
+    name: 'GlobalStandard'
     capacity: 30  // 30K TPM — sufficient for POC within budget
   }
   properties: {
@@ -39,7 +39,7 @@ resource gptDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-10
   }
 }
 
-resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-10-01-preview' = {
+resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: openAi
   name: embeddingModelName
   dependsOn: [gptDeployment]
@@ -58,12 +58,12 @@ resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
 
 // GPT-4o-mini — evaluation gate (groundedness, completeness, coherence) and classification
 // ~15x cheaper than GPT-4o; sufficient for structured scoring tasks
-resource miniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-10-01-preview' = {
+resource miniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: openAi
   name: 'gpt-4o-mini'
   dependsOn: [embeddingDeployment]
   sku: {
-    name: 'Standard'
+    name: 'GlobalStandard'
     capacity: 30
   }
   properties: {
@@ -77,12 +77,12 @@ resource miniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-1
 
 // o3-mini — parameter accuracy evaluation and budget audit
 // Reasoning model; catches arithmetic and parameter-matching edge cases GPT-4o misses
-resource o3MiniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-10-01-preview' = {
+resource o3MiniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: openAi
   name: 'o3-mini'
   dependsOn: [miniDeployment]
   sku: {
-    name: 'Standard'
+    name: 'GlobalStandard'
     capacity: 10
   }
   properties: {
