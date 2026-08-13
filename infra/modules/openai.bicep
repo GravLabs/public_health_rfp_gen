@@ -56,44 +56,6 @@ resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
   }
 }
 
-// GPT-4o-mini — evaluation gate (groundedness, completeness, coherence) and classification
-// ~15x cheaper than GPT-4o; sufficient for structured scoring tasks
-resource miniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
-  parent: openAi
-  name: 'gpt-4o-mini'
-  dependsOn: [embeddingDeployment]
-  sku: {
-    name: 'GlobalStandard'
-    capacity: 30
-  }
-  properties: {
-    model: {
-      format: 'OpenAI'
-      name: 'gpt-4o-mini'
-      version: '2025-01-01'
-    }
-  }
-}
-
-// o3-mini — parameter accuracy evaluation and budget audit
-// Reasoning model; catches arithmetic and parameter-matching edge cases GPT-4o misses
-resource o3MiniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
-  parent: openAi
-  name: 'o3-mini'
-  dependsOn: [miniDeployment]
-  sku: {
-    name: 'Standard'
-    capacity: 10
-  }
-  properties: {
-    model: {
-      format: 'OpenAI'
-      name: 'o3-mini'
-      version: '2025-01-31'
-    }
-  }
-}
-
 // Grant managed identity Cognitive Services OpenAI User
 resource openAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(openAi.id, identityPrincipalId, '5e0bd9bd-7b93-4f28-af87-19fc36ad1654')
