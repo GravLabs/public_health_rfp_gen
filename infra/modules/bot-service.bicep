@@ -3,7 +3,7 @@
 // No M365 Copilot license required — standard Teams inclusion.
 
 param name string
-param location string = 'global'   // Bot Service is a global resource
+param location string = 'global'
 param tags object = {}
 param displayName string = 'Public Health RFP Bot'
 param messagingEndpoint string     // e.g. https://<api-ca-url>/api/messages
