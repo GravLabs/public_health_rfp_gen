@@ -5,6 +5,7 @@ Run once after azd up via post-provision hook.
 """
 
 import os
+from azure.core.credentials import AzureKeyCredential
 from azure.identity import DefaultAzureCredential
 from azure.search.documents.indexes import SearchIndexClient
 from azure.search.documents.indexes.models import (
@@ -17,11 +18,12 @@ from azure.search.documents.indexes.models import (
 
 INDEX_NAME = os.getenv("AZURE_SEARCH_INDEX", "pubhealth-rfp-index")
 SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")
-EMBEDDING_DIMENSIONS = 3072  # text-embedding-3-large
+EMBEDDING_DIMENSIONS = 1536  # text-embedding-3-small
 
 
 def create_rfp_index() -> None:
-    credential = DefaultAzureCredential()
+    _key = os.getenv("AZURE_SEARCH_ADMIN_KEY")
+    credential = AzureKeyCredential(_key) if _key else DefaultAzureCredential()
     client = SearchIndexClient(endpoint=SEARCH_ENDPOINT, credential=credential)
 
     fields = [

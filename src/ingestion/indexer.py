@@ -6,6 +6,7 @@ Uses DefaultAzureCredential (managed identity) — no keys.
 import os
 from dataclasses import asdict
 from openai import AzureOpenAI
+from azure.core.credentials import AzureKeyCredential
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from azure.search.documents import SearchClient
 
@@ -20,6 +21,9 @@ BATCH_SIZE = 16
 
 
 def _get_openai_client(credential: DefaultAzureCredential) -> AzureOpenAI:
+    api_key = os.getenv("AZURE_OPENAI_API_KEY")
+    if api_key:
+        return AzureOpenAI(azure_endpoint=OPENAI_ENDPOINT, api_key=api_key, api_version="2024-06-01")
     token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
     return AzureOpenAI(
         azure_endpoint=OPENAI_ENDPOINT,
@@ -38,10 +42,12 @@ def index_chunks(chunks: list[Chunk], credential: DefaultAzureCredential) -> int
         return 0
 
     oai_client = _get_openai_client(credential)
+    _search_key = os.getenv("AZURE_SEARCH_ADMIN_KEY")
+    search_credential = AzureKeyCredential(_search_key) if _search_key else credential
     search_client = SearchClient(
         endpoint=SEARCH_ENDPOINT,
         index_name=INDEX_NAME,
-        credential=credential,
+        credential=search_credential,
     )
 
     indexed = 0

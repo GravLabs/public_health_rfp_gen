@@ -43,6 +43,20 @@ if [ -f "src/ingestion/create_index.py" ]; then
   export AZURE_SEARCH_ENDPOINT="$SEARCH_ENDPOINT"
   export AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT"
   export AZURE_STORAGE_ACCOUNT="$ACCOUNT"
+
+  # CLI user lacks data-plane RBAC on Search and OpenAI — fetch keys via ARM
+  RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
+  SEARCH_SERVICE=$(echo "$SEARCH_ENDPOINT" | sed 's|https://||' | cut -d'.' -f1)
+  OPENAI_RESOURCE=$(echo "$OPENAI_ENDPOINT" | sed 's|https://||' | cut -d'.' -f1)
+  export AZURE_SEARCH_ADMIN_KEY=$(az search admin-key show \
+    --resource-group "$RESOURCE_GROUP" \
+    --service-name "$SEARCH_SERVICE" \
+    --query primaryKey -o tsv)
+  export AZURE_OPENAI_API_KEY=$(az cognitiveservices account keys list \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$OPENAI_RESOURCE" \
+    --query key1 -o tsv)
+
   echo "      Installing ingestion dependencies..."
   # --target avoids needing python3-venv and bypasses externally-managed-environment
   pip3 install --target /tmp/aphl-ingest-deps -r src/ingestion/requirements.txt -q
