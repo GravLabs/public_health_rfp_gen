@@ -42,6 +42,8 @@ echo "[3/6] Creating AI Search index and running ingestion pipeline"
 if [ -f "src/ingestion/create_index.py" ]; then
   export AZURE_SEARCH_ENDPOINT="$SEARCH_ENDPOINT"
   export AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT"
+  echo "      Installing ingestion dependencies..."
+  pip install -r src/api/requirements.txt --quiet
   python3 src/ingestion/create_index.py
   python3 src/ingestion/pipeline.py
 else
