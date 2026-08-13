@@ -44,11 +44,11 @@ if [ -f "src/ingestion/create_index.py" ]; then
   export AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT"
   export AZURE_STORAGE_ACCOUNT="$ACCOUNT"
   echo "      Installing ingestion dependencies..."
-  python3 -m venv /tmp/aphl-ingest-venv
-  /tmp/aphl-ingest-venv/bin/pip install -r src/ingestion/requirements.txt --quiet
-  /tmp/aphl-ingest-venv/bin/python3 src/ingestion/create_index.py
-  # pipeline.py imports local siblings (document_parser, chunker, indexer)
-  PYTHONPATH="$PWD/src/ingestion" /tmp/aphl-ingest-venv/bin/python3 src/ingestion/pipeline.py
+  # --target avoids needing python3-venv and bypasses externally-managed-environment
+  pip3 install --target /tmp/aphl-ingest-deps -r src/ingestion/requirements.txt -q
+  PYTHONPATH="/tmp/aphl-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/create_index.py
+  # pipeline.py imports local siblings (document_parser, chunker, indexer) via PYTHONPATH
+  PYTHONPATH="/tmp/aphl-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/pipeline.py
 else
   echo "      ⚠ src/ingestion/create_index.py not found — skipping ingestion"
 fi
