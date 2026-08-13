@@ -124,7 +124,7 @@ module aiFoundry 'modules/ai-foundry.bicep' = {
     location: location
     tags: tags
     identityPrincipalId: identity.outputs.principalId
-    storageResourceId: storage.outputs.resourceId
+    mlStorageName: 'stml${resourceToken}'
     keyVaultResourceId: keyVault.outputs.resourceId
     appInsightsResourceId: monitoring.outputs.appInsightsId
   }

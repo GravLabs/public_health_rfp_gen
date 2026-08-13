@@ -179,60 +179,15 @@ resource apiPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-09-01-pre
 <policies>
   <inbound>
     <base />
-
-    <!-- Use SystemAssigned managed identity — no API keys in code -->
     <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
-
-    <!-- Semantic caching: return cached response for semantically similar prompts -->
-    <azure-openai-semantic-caching-lookup
-      score-threshold="0.05"
-      embeddings-backend-id="openai-base"
-      embeddings-backend-auth="system-assigned"
-      ignore-system-prompt="false"
-      max-message-count="10" />
-
-    <!-- Per-subscription token budget: 500K tokens/minute, 5M/month -->
-    <azure-openai-token-limit
-      tokens-per-minute="500000"
-      counter-key="@(context.Subscription.Id)"
-      estimate-prompt-tokens="true"
-      tokens-consumed-header-name="x-tokens-consumed"
-      remaining-tokens-header-name="x-tokens-remaining" />
-
-    <!--
-      Model routing by deployment name:
-        gpt-4o-mini  → base backend directly (eval gate: groundedness/completeness/coherence + classification)
-        o3-mini      → base backend directly (reasoning: parameter accuracy, budget audit)
-        anything else → pool (fine-tuned GPT-4o p1, base GPT-4o p2 fallback)
-    -->
-    <choose>
-      <when condition="@(new[]{"gpt-4o-mini","o3-mini"}.Contains(context.Request.MatchedParameters.GetValueOrDefault("deploymentId","")))">
-        <set-backend-service backend-id="openai-base" />
-      </when>
-      <otherwise>
-        <set-backend-service backend-id="openai-pool" />
-      </otherwise>
-    </choose>
+    <set-backend-service backend-id="openai-pool" />
   </inbound>
-
   <backend>
     <base />
   </backend>
-
   <outbound>
     <base />
-
-    <!-- Store cache entry on miss -->
-    <azure-openai-semantic-caching-store duration="3600" />
-
-    <!-- Emit token metrics to Application Insights -->
-    <azure-openai-emit-token-metric namespace="PubHealthRfp">
-      <dimension name="consumer" value="@(context.Subscription.Name)" />
-      <dimension name="deployment" value="@(context.Request.MatchedParameters["deploymentId"])" />
-      <dimension name="program_area" value="@(context.Request.Headers.GetValueOrDefault("x-program-area","unknown"))" />
-    </azure-openai-emit-token-metric>
   </outbound>
-
   <on-error>
     <base />
   </on-error>

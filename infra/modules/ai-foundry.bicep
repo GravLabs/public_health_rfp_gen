@@ -3,9 +3,23 @@ param projectName string
 param location string
 param tags object = {}
 param identityPrincipalId string
-param storageResourceId string
+param mlStorageName string      // separate non-HNS storage (AI Foundry doesn't support ADLS Gen2)
 param keyVaultResourceId string
 param appInsightsResourceId string
+
+// Standard storage for ML workspace — HNS disabled (AI Foundry rejects ADLS Gen2)
+resource mlStorage 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: mlStorageName
+  location: location
+  tags: tags
+  kind: 'StorageV2'
+  sku: { name: 'Standard_LRS' }
+  properties: {
+    isHnsEnabled: false
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+  }
+}
 
 // AI Foundry Hub
 resource hub 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
@@ -17,7 +31,7 @@ resource hub 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
     type: 'SystemAssigned'
   }
   properties: {
-    storageAccount: storageResourceId
+    storageAccount: mlStorage.id
     keyVault: keyVaultResourceId
     applicationInsights: appInsightsResourceId
     publicNetworkAccess: 'Enabled'
