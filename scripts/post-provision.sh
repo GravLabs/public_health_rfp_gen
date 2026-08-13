@@ -20,7 +20,8 @@ if [ -d "data/sample-rfps" ]; then
     --source "data/sample-rfps" \
     --pattern "*.md" \
     --auth-mode key \
-    --overwrite
+    --overwrite \
+    --output none
 else
   echo "      ⚠ data/sample-rfps not found — skipping (add .md files there to populate)"
 fi
@@ -33,7 +34,8 @@ if [ -d "data/eval-examples" ]; then
     --source "data/eval-examples" \
     --pattern "*.json" \
     --auth-mode key \
-    --overwrite
+    --overwrite \
+    --output none
 else
   echo "      ⚠ data/eval-examples not found — skipping (add .json files there to populate)"
 fi
@@ -59,7 +61,8 @@ if [ -f "src/ingestion/create_index.py" ]; then
 
   echo "      Installing ingestion dependencies..."
   # --target avoids needing python3-venv and bypasses externally-managed-environment
-  pip3 install --target /tmp/aphl-ingest-deps -r src/ingestion/requirements.txt -q
+  pip3 install --target /tmp/aphl-ingest-deps -r src/ingestion/requirements.txt -q 2>/dev/null || \
+    pip3 install --target /tmp/aphl-ingest-deps -r src/ingestion/requirements.txt -q
   PYTHONPATH="/tmp/aphl-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/create_index.py
   # pipeline.py imports local siblings (document_parser, chunker, indexer) via PYTHONPATH
   PYTHONPATH="/tmp/aphl-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/pipeline.py
