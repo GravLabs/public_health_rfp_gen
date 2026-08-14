@@ -127,7 +127,7 @@ azd up
 | Key Vault | `kvph*` | Secrets storage |
 | Storage Account | `stpubhealth*` | ADLS Gen2 for RFP corpus |
 | ML Storage Account | `stml*` | Standard storage for AI Foundry |
-| Azure OpenAI | `cog-pubhealth-oai-*` | GPT-4o + text-embedding-3-large |
+| Azure OpenAI | `cog-pubhealth-oai-*` | GPT-4o + text-embedding-3-small |
 | Document Intelligence | `cog-pubhealth-di-*` | PDF/DOCX parsing |
 | AI Search | `srch-pubhealth-*` | Hybrid + semantic search index |
 | Log Analytics | `log-pubhealth-*` | Centralized logs |

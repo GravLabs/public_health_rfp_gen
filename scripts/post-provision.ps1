@@ -14,29 +14,66 @@ $FOUNDRY_PROJECT  = try { azd env get-value AZURE_AI_FOUNDRY_PROJECT_NAME } catc
 $CONTAINER        = "rfp-corpus"
 
 Write-Host ""
-Write-Host "[1/6] Uploading 50 sample RFPs to blob storage: $ACCOUNT/$CONTAINER"
-az storage blob upload-batch `
-    --account-name $ACCOUNT `
-    --destination  $CONTAINER `
-    --source       "data/sample-rfps" `
-    --pattern      "*.md" `
-    --auth-mode    login `
-    --overwrite
+Write-Host "[1/6] Uploading sample RFPs to blob storage: $ACCOUNT/$CONTAINER"
+if (Test-Path "data/sample-rfps") {
+    az storage blob upload-batch `
+        --account-name $ACCOUNT `
+        --destination  $CONTAINER `
+        --source       "data/sample-rfps" `
+        --pattern      "*.md" `
+        --auth-mode    key `
+        --overwrite `
+        --output none
+} else {
+    Write-Host "      WARNING: data/sample-rfps not found — skipping"
+}
 
-Write-Host "[2/6] Uploading 20 eval examples to golden-dataset container"
-az storage blob upload-batch `
-    --account-name $ACCOUNT `
-    --destination  "golden-dataset" `
-    --source       "data/eval-examples" `
-    --pattern      "*.json" `
-    --auth-mode    login `
-    --overwrite
+Write-Host "[2/6] Uploading eval examples to golden-dataset container"
+if (Test-Path "data/eval-examples") {
+    az storage blob upload-batch `
+        --account-name $ACCOUNT `
+        --destination  "golden-dataset" `
+        --source       "data/eval-examples" `
+        --pattern      "*.json" `
+        --auth-mode    key `
+        --overwrite `
+        --output none
+} else {
+    Write-Host "      WARNING: data/eval-examples not found — skipping"
+}
 
 Write-Host "[3/6] Creating AI Search index and running ingestion pipeline"
-$env:AZURE_SEARCH_ENDPOINT = $SEARCH_ENDPOINT
-$env:AZURE_OPENAI_ENDPOINT = $OPENAI_ENDPOINT
-python src/ingestion/create_index.py
-python src/ingestion/pipeline.py
+if (Test-Path "src/ingestion/create_index.py") {
+    $env:AZURE_SEARCH_ENDPOINT  = $SEARCH_ENDPOINT
+    $env:AZURE_OPENAI_ENDPOINT  = $OPENAI_ENDPOINT
+    $env:AZURE_STORAGE_ACCOUNT  = $ACCOUNT
+
+    # CLI user lacks data-plane RBAC on Search and OpenAI — fetch keys via ARM
+    $RESOURCE_GROUP  = azd env get-value AZURE_RESOURCE_GROUP
+    $SEARCH_SERVICE  = ($SEARCH_ENDPOINT -replace "https://","") -split "\." | Select-Object -First 1
+    $OPENAI_RESOURCE = ($OPENAI_ENDPOINT -replace "https://","") -split "\." | Select-Object -First 1
+
+    $env:AZURE_SEARCH_ADMIN_KEY = (az search admin-key show `
+        --resource-group $RESOURCE_GROUP `
+        --service-name $SEARCH_SERVICE `
+        --query primaryKey -o tsv)
+    $env:AZURE_OPENAI_API_KEY = (az cognitiveservices account keys list `
+        --resource-group $RESOURCE_GROUP `
+        --name $OPENAI_RESOURCE `
+        --query key1 -o tsv)
+
+    Write-Host "      Installing ingestion dependencies..."
+    pip install --target "$env:TEMP\aphl-ingest-deps" -r src/ingestion/requirements.txt -q 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        pip install --target "$env:TEMP\aphl-ingest-deps" -r src/ingestion/requirements.txt -q
+    }
+
+    $env:PYTHONPATH = "$env:TEMP\aphl-ingest-deps;$PWD\src\ingestion"
+    python src/ingestion/create_index.py
+    python src/ingestion/pipeline.py
+} else {
+    Write-Host "      WARNING: src/ingestion/create_index.py not found — skipping ingestion"
+}
 
 Write-Host "[4/6] Setting up AI Foundry connections"
 if ($FOUNDRY_PROJECT) {
