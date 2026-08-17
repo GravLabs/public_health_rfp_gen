@@ -29,7 +29,7 @@
       "scopes": ["personal", "team", "groupchat"],
       "supportsFiles": false,
       "isNotificationOnly": false,
-      "supportChannelFeatures": ["privateChannelMemberIdsInPayload", "sharedChannels"],
+      "supportsChannelFeatures": ["privateChannelMemberIdsInPayload", "sharedChannels"],
       "commandLists": [
         {
           "scopes": ["personal", "team", "groupchat"],
@@ -47,6 +47,10 @@
       ]
     }
   ],
+  "webApplicationInfo": {
+    "id": "${{MICROSOFT_APP_ID}}",
+    "resource": "https://RscBasedStoreApp"
+  },
   "permissions": ["identity", "messageTeamMembers"],
   "authorization": {
     "permissions": {
