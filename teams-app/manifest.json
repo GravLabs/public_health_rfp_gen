@@ -45,33 +45,6 @@
       ]
     }
   ],
-  "webApplicationInfo": {
-    "id": "${{MICROSOFT_APP_ID}}",
-    "resource": "https://RscBasedStoreApp"
-  },
-  "permissions": ["identity", "messageTeamMembers"],
-  "authorization": {
-    "permissions": {
-      "resourceSpecific": [
-        {
-          "name": "ChannelMessage.Read.Group",
-          "type": "Application"
-        },
-        {
-          "name": "ChatMessage.Read.Chat",
-          "type": "Application"
-        },
-        {
-          "name": "ChatMember.Read.Chat",
-          "type": "Application"
-        },
-        {
-          "name": "TeamMember.Read.Group",
-          "type": "Application"
-        }
-      ]
-    }
-  },
   "validDomains": [
     "ca-pubhealth-api-2gdlihbjsb5rk.wittysmoke-fc94257b.eastus.azurecontainerapps.io"
   ]
