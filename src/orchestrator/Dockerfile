@@ -6,10 +6,10 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS publish
 WORKDIR /src
 ENV DOTNET_GCConserveMemory=9
 COPY ["pubhealth-rfp-orchestrator.csproj", "."]
-RUN dotnet restore "./pubhealth-rfp-orchestrator.csproj" --no-parallel
+RUN dotnet restore "./pubhealth-rfp-orchestrator.csproj"
 COPY . .
 RUN dotnet publish "./pubhealth-rfp-orchestrator.csproj" -c Release -o /app/publish \
-    /p:UseAppHost=false --no-parallel
+    /p:UseAppHost=false /p:BuildInParallel=false /maxcpucount:1
 
 FROM base AS final
 WORKDIR /app
