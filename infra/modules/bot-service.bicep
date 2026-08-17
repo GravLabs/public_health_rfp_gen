@@ -40,6 +40,7 @@ resource teamsChannel 'Microsoft.BotService/botServices/channels@2022-09-15' = {
     properties: {
       enableCalling: false
       isEnabled: true
+      acceptedTerms: true
     }
   }
 }
