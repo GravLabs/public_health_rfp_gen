@@ -36,20 +36,7 @@ az bot update \
   --output none
 echo "  ✓ Bot Service endpoint updated"
 
-# Set MICROSOFT_APP_ID on the API container app so BotFrameworkAdapter authenticates correctly
-API_APP=$(az containerapp list \
-  --resource-group "$RESOURCE_GROUP" \
-  --query "[?tags.\"azd-service-name\"=='api'].name | [0]" \
-  -o tsv 2>/dev/null || echo "")
-
-if [ -n "$API_APP" ] && [ -n "$CLIENT_ID" ]; then
-  az containerapp update \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$API_APP" \
-    --set-env-vars "MICROSOFT_APP_ID=${CLIENT_ID}" \
-    --output none
-  echo "  ✓ MICROSOFT_APP_ID set on API container app"
-fi
+# MICROSOFT_APP_ID, MICROSOFT_APP_PASSWORD, MICROSOFT_APP_TYPE are injected via Bicep env vars
 
 # Persist the messaging endpoint for reference
 azd env set BOT_MESSAGING_ENDPOINT "$MESSAGING_ENDPOINT"

@@ -14,6 +14,9 @@ param embeddingModelName string = 'text-embedding-3-small'
 param searchSkuName string = 'basic'
 param budgetAmountUsd int = 500
 param botMessagingEndpoint string = 'https://placeholder.example.com/api/messages'
+param botAppId string = '23bfa01a-297d-4385-ba74-7482ff9799d8'
+@secure()
+param botAppSecret string = ''
 param tags object = {}
 
 var abbrs = loadJsonContent('./abbreviations.json')
@@ -167,8 +170,9 @@ module containerApps 'modules/container-apps.bicep' = {
       { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: monitoring.outputs.appInsightsConnectionString }
       { name: 'AZURE_APIM_GATEWAY_URL', value: apim.outputs.gatewayUrl }
       { name: 'AZURE_AI_FOUNDRY_PROJECT_ENDPOINT', value: aiFoundry.outputs.projectEndpoint }
-      { name: 'MICROSOFT_APP_ID', value: identity.outputs.clientId }
-      { name: 'MICROSOFT_APP_TYPE', value: 'UserAssignedMSI' }
+      { name: 'MICROSOFT_APP_ID', value: botAppId }
+      { name: 'MICROSOFT_APP_PASSWORD', value: botAppSecret }
+      { name: 'MICROSOFT_APP_TYPE', value: 'SingleTenant' }
       { name: 'MICROSOFT_APP_TENANT_ID', value: tenant().tenantId }
       { name: 'MONTHLY_BUDGET_USD', value: '500' }
       { name: 'BUDGET_WARN_THRESHOLD', value: '0.80' }
@@ -202,9 +206,8 @@ module botService 'modules/bot-service.bicep' = {
     name: 'bot-pubhealth-rfp-${resourceToken}'
     tags: tags
     messagingEndpoint: botMessagingEndpoint
-    microsoftAppId: identity.outputs.clientId
+    microsoftAppId: botAppId
     tenantId: tenant().tenantId
-    identityResourceId: identity.outputs.identityId
   }
 }
 

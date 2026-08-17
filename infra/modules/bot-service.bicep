@@ -7,9 +7,8 @@ param location string = 'global'
 param tags object = {}
 param displayName string = 'Public Health RFP Bot'
 param messagingEndpoint string     // e.g. https://<api-ca-url>/api/messages
-param microsoftAppId string        // Client ID of the user-assigned managed identity
-param tenantId string              // AAD tenant ID — required for UserAssignedMSI bot type
-param identityResourceId string    // full resource ID of the user-assigned managed identity
+param microsoftAppId string        // Client ID of the Azure AD App Registration for the bot
+param tenantId string              // AAD tenant ID
 
 // ── Bot Channels Registration ─────────────────────────────────────────────────
 resource botService 'Microsoft.BotService/botServices@2022-09-15' = {
@@ -24,9 +23,8 @@ resource botService 'Microsoft.BotService/botServices@2022-09-15' = {
     displayName: displayName
     endpoint: messagingEndpoint
     msaAppId: microsoftAppId
-    msaAppType: 'UserAssignedMSI'
+    msaAppType: 'SingleTenant'
     msaAppTenantId: tenantId
-    msaAppMSIResourceId: identityResourceId
     isStreamingSupported: false
     schemaTransformationVersion: '1.3'
   }

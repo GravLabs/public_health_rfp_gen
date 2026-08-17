@@ -50,8 +50,8 @@ credential = DefaultAzureCredential()
 # ── Teams Bot adapter ──────────────────────────────────────────────────────────
 _bot_adapter = BotFrameworkAdapter(BotFrameworkAdapterSettings(
     app_id=os.getenv("MICROSOFT_APP_ID", ""),
-    app_password="",  # UserAssignedMSI — no password
-    app_type="UserAssignedMSI",
+    app_password=os.getenv("MICROSOFT_APP_PASSWORD", ""),
+    app_type=os.getenv("MICROSOFT_APP_TYPE", "SingleTenant"),
     app_tenantid=os.getenv("MICROSOFT_APP_TENANT_ID", ""),
 ))
 
