@@ -168,6 +168,8 @@ module containerApps 'modules/container-apps.bicep' = {
       { name: 'AZURE_APIM_GATEWAY_URL', value: apim.outputs.gatewayUrl }
       { name: 'AZURE_AI_FOUNDRY_PROJECT_ENDPOINT', value: aiFoundry.outputs.projectEndpoint }
       { name: 'MICROSOFT_APP_ID', value: identity.outputs.clientId }
+      { name: 'MICROSOFT_APP_TYPE', value: 'UserAssignedMSI' }
+      { name: 'MICROSOFT_APP_TENANT_ID', value: tenant().tenantId }
       { name: 'MONTHLY_BUDGET_USD', value: '500' }
       { name: 'BUDGET_WARN_THRESHOLD', value: '0.80' }
       { name: 'BUDGET_CRITICAL_THRESHOLD', value: '0.95' }
