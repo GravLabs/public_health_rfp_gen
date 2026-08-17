@@ -30,7 +30,9 @@ def process_blob(blob_name: str, content: bytes, credential) -> int:
 
 
 def run_pipeline(file_filter: str | None = None) -> None:
-    credential = DefaultAzureCredential()
+    # During post-provision the CLI user may lack Storage RBAC; fall back to key auth.
+    storage_key = os.getenv("AZURE_STORAGE_KEY")
+    credential = storage_key if storage_key else DefaultAzureCredential()
     blob_client = BlobServiceClient(
         account_url=f"https://{STORAGE_ACCOUNT}.blob.core.windows.net",
         credential=credential,

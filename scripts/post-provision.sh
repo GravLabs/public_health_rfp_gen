@@ -58,6 +58,10 @@ if [ -f "src/ingestion/create_index.py" ]; then
     --resource-group "$RESOURCE_GROUP" \
     --name "$OPENAI_RESOURCE" \
     --query key1 -o tsv)
+  export AZURE_STORAGE_KEY=$(az storage account keys list \
+    --resource-group "$RESOURCE_GROUP" \
+    --account-name "$ACCOUNT" \
+    --query "[0].value" -o tsv)
 
   echo "      Installing ingestion dependencies..."
   # --target avoids needing python3-venv and bypasses externally-managed-environment
