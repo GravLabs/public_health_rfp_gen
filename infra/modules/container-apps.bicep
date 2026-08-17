@@ -8,6 +8,8 @@ param identityId string                  // user-assigned managed identity resou
 param identityPrincipalId string         // object/principal ID (for RBAC role assignment)
 param apiAppName string
 param orchestratorAppName string
+param apiEnvVars array = []
+param orchestratorEnvVars array = []
 
 var placeholder = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
@@ -51,31 +53,7 @@ resource containerAppsEnv 'Microsoft.App/managedEnvironments@2023-11-02-preview'
   }
 }
 
-resource apiApp 'Microsoft.App/containerApps@2023-11-02-preview' = {
-  name: apiAppName
-  location: location
-  tags: union(tags, { 'azd-service-name': 'api' })
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: { '${identityId}': {} }
-  }
-  properties: {
-    managedEnvironmentId: containerAppsEnv.id
-    configuration: {
-      ingress: {
-        external: true
-        targetPort: 8000
-        transport: 'http'
-      }
-      registries: [{ server: registry.properties.loginServer, identity: identityId }]
-    }
-    template: {
-      containers: [{ name: 'api', image: placeholder, resources: { cpu: json('0.5'), memory: '1Gi' } }]
-      scale: { minReplicas: 1, maxReplicas: 3 }
-    }
-  }
-}
-
+// Orchestrator defined first so its FQDN can be referenced by apiApp
 resource orchestratorApp 'Microsoft.App/containerApps@2023-11-02-preview' = {
   name: orchestratorAppName
   location: location
@@ -95,8 +73,43 @@ resource orchestratorApp 'Microsoft.App/containerApps@2023-11-02-preview' = {
       registries: [{ server: registry.properties.loginServer, identity: identityId }]
     }
     template: {
-      containers: [{ name: 'orchestrator', image: placeholder, resources: { cpu: json('1'), memory: '2Gi' } }]
+      containers: [{
+        name: 'orchestrator'
+        image: placeholder
+        resources: { cpu: json('1'), memory: '2Gi' }
+        env: orchestratorEnvVars
+      }]
       scale: { minReplicas: 1, maxReplicas: 2 }
+    }
+  }
+}
+
+resource apiApp 'Microsoft.App/containerApps@2023-11-02-preview' = {
+  name: apiAppName
+  location: location
+  tags: union(tags, { 'azd-service-name': 'api' })
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: { '${identityId}': {} }
+  }
+  properties: {
+    managedEnvironmentId: containerAppsEnv.id
+    configuration: {
+      ingress: {
+        external: true
+        targetPort: 8000
+        transport: 'http'
+      }
+      registries: [{ server: registry.properties.loginServer, identity: identityId }]
+    }
+    template: {
+      containers: [{
+        name: 'api'
+        image: placeholder
+        resources: { cpu: json('0.5'), memory: '1Gi' }
+        env: union(apiEnvVars, [{ name: 'ORCHESTRATOR_URL', value: 'https://${orchestratorApp.properties.configuration.ingress.fqdn}' }])
+      }]
+      scale: { minReplicas: 1, maxReplicas: 3 }
     }
   }
 }
