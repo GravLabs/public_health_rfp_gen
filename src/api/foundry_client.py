@@ -14,14 +14,18 @@ import logging
 import os
 from typing import Optional, Any
 
-from azure.ai.evaluation import (
-    GroundednessEvaluator,
-    CoherenceEvaluator,
-    AzureOpenAIModelConfiguration,
-)
-from azure.ai.evaluation.simulator import AdversarialSimulator
 from azure.identity import DefaultAzureCredential
 import httpx
+
+try:
+    from azure.ai.evaluation import (
+        GroundednessEvaluator,
+        CoherenceEvaluator,
+        AzureOpenAIModelConfiguration,
+    )
+    _EVAL_SDK_AVAILABLE = True
+except ImportError:
+    _EVAL_SDK_AVAILABLE = False
 
 log = logging.getLogger(__name__)
 
@@ -44,17 +48,22 @@ class FoundryEvaluatorClient:
 
     def __init__(self, credential: Optional[DefaultAzureCredential] = None):
         self._credential = credential or DefaultAzureCredential()
-        self._model_config = AzureOpenAIModelConfiguration(
-            azure_endpoint=AZURE_OPENAI_ENDPOINT,
-            azure_deployment=AZURE_OPENAI_CHAT_DEPLOYMENT,
-            # DefaultAzureCredential handles auth — no api_key needed
-        )
+        if _EVAL_SDK_AVAILABLE:
+            self._model_config = AzureOpenAIModelConfiguration(
+                azure_endpoint=AZURE_OPENAI_ENDPOINT,
+                azure_deployment=AZURE_OPENAI_CHAT_DEPLOYMENT,
+            )
+        else:
+            self._model_config = None
+            log.warning("azure-ai-evaluation not installed — Foundry evaluators disabled")
 
     def evaluate_groundedness(self, query: str, response: str, context: str) -> float:
         """
         Score response groundedness against context using AI Foundry.
         Returns normalized score 0.0–1.0.
         """
+        if not _EVAL_SDK_AVAILABLE or self._model_config is None:
+            return 0.5
         try:
             evaluator = GroundednessEvaluator(model_config=self._model_config)
             result = evaluator(query=query, response=response, context=context)
@@ -62,13 +71,15 @@ class FoundryEvaluatorClient:
             return round(_LIKERT_NORMALIZE(raw), 4)
         except Exception as e:
             log.warning("Groundedness evaluation failed: %s", e)
-            return 0.5  # neutral fallback — not a free pass
+            return 0.5
 
     def evaluate_coherence(self, query: str, response: str) -> float:
         """
         Score response coherence using AI Foundry.
         Returns normalized score 0.0–1.0.
         """
+        if not _EVAL_SDK_AVAILABLE or self._model_config is None:
+            return 0.5
         try:
             evaluator = CoherenceEvaluator(model_config=self._model_config)
             result = evaluator(query=query, response=response)
