@@ -209,4 +209,6 @@ output AZURE_APIM_NAME string = apim.outputs.apimName
 
 output AZURE_AI_FOUNDRY_PROJECT_ENDPOINT string = aiFoundry.outputs.projectEndpoint
 
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerApps.outputs.registryLoginServer
+
 output AZURE_BOT_NAME string = botService.outputs.botName
