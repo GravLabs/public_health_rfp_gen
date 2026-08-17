@@ -13,7 +13,6 @@ param openAiModelVersion string = '2024-08-06'
 param embeddingModelName string = 'text-embedding-3-small'
 param searchSkuName string = 'basic'
 param budgetAmountUsd int = 500
-param botMessagingEndpoint string = 'https://placeholder.example.com/api/messages'
 param botAppId string = '23bfa01a-297d-4385-ba74-7482ff9799d8'
 @secure()
 param botAppSecret string = ''
@@ -207,7 +206,7 @@ module botService 'modules/bot-service.bicep' = {
   params: {
     name: 'bot-pubhealth-rfp-${resourceToken}'
     tags: tags
-    messagingEndpoint: botMessagingEndpoint
+    messagingEndpoint: 'https://${containerApps.outputs.apiAppFqdn}/api/messages'
     microsoftAppId: botAppId
     tenantId: tenant().tenantId
   }
