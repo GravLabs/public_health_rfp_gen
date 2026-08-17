@@ -130,7 +130,7 @@ module aiFoundry 'modules/ai-foundry.bicep' = {
   }
 }
 
-// Container Apps Environment + Registry (for FastAPI review API)
+// Container Apps Environment + Registry + Container Apps
 module containerApps 'modules/container-apps.bicep' = {
   name: 'containerApps'
   scope: rg
@@ -141,6 +141,10 @@ module containerApps 'modules/container-apps.bicep' = {
     tags: tags
     logAnalyticsCustomerId: monitoring.outputs.logAnalyticsWorkspaceId
     logAnalyticsResourceId: monitoring.outputs.logAnalyticsId
+    identityId: identity.outputs.identityId
+    identityPrincipalId: identity.outputs.principalId
+    apiAppName: 'ca-pubhealth-api-${resourceToken}'
+    orchestratorAppName: 'ca-pubhealth-orch-${resourceToken}'
   }
 }
 
