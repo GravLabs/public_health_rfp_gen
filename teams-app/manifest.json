@@ -3,7 +3,6 @@
   "manifestVersion": "1.27",
   "version": "1.0.0",
   "id": "${{MICROSOFT_APP_ID}}",
-  "packageName": "com.graviton.pubhealth.rfp",
   "developer": {
     "name": "Graviton Labs",
     "websiteUrl": "https://www.graviton-labs.com",
@@ -29,7 +28,6 @@
       "scopes": ["personal", "team", "groupchat"],
       "supportsFiles": false,
       "isNotificationOnly": false,
-      "supportsChannelFeatures": ["privateChannelMemberIdsInPayload", "sharedChannels"],
       "commandLists": [
         {
           "scopes": ["personal", "team", "groupchat"],
