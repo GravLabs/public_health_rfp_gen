@@ -4,13 +4,12 @@ EXPOSE 5001
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+ENV DOTNET_GCConserveMemory=9
 COPY ["pubhealth-rfp-orchestrator.csproj", "."]
-RUN dotnet restore "./pubhealth-rfp-orchestrator.csproj"
+RUN dotnet restore "./pubhealth-rfp-orchestrator.csproj" --no-parallel
 COPY . .
-RUN dotnet build "./pubhealth-rfp-orchestrator.csproj" -c Release -o /app/build
-
-FROM build AS publish
-RUN dotnet publish "./pubhealth-rfp-orchestrator.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./pubhealth-rfp-orchestrator.csproj" -c Release -o /app/publish \
+    /p:UseAppHost=false --no-parallel
 
 FROM base AS final
 WORKDIR /app

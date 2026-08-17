@@ -13,8 +13,8 @@ services:
     language: python
     host: containerapp
     docker:
-      context: src
-      path: api/Dockerfile
+      context: ../
+      path: Dockerfile
   orchestrator:
     project: src/orchestrator
     language: dotnet
