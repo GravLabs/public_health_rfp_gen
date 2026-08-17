@@ -33,3 +33,5 @@ data/training/
 # Output
 output/
 drafts/
+*.bak
+teams-app/*.zip
