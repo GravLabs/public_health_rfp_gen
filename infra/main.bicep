@@ -149,6 +149,7 @@ module containerApps 'modules/container-apps.bicep' = {
     apiAppName: 'ca-pubhealth-api-${resourceToken}'
     orchestratorAppName: 'ca-pubhealth-orch-${resourceToken}'
     orchestratorEnvVars: [
+      { name: 'AZURE_CLIENT_ID', value: identity.outputs.clientId }
       { name: 'AZURE_OPENAI_ENDPOINT', value: openAi.outputs.endpoint }
       { name: 'AZURE_OPENAI_GPT_DEPLOYMENT', value: openAiModelName }
       { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o-mini' }
@@ -157,6 +158,7 @@ module containerApps 'modules/container-apps.bicep' = {
       { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: monitoring.outputs.appInsightsConnectionString }
     ]
     apiEnvVars: [
+      { name: 'AZURE_CLIENT_ID', value: identity.outputs.clientId }
       { name: 'AZURE_OPENAI_ENDPOINT', value: openAi.outputs.endpoint }
       { name: 'AZURE_OPENAI_GPT_DEPLOYMENT', value: openAiModelName }
       { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o-mini' }
