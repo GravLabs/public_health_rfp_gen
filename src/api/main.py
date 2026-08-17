@@ -347,6 +347,7 @@ async def foundry_info():
 @app.post("/api/messages", summary="Teams Bot webhook")
 async def messages(req: Request) -> Response:
     """Bot Framework webhook — receives all Teams channel activities."""
+    print("=== /api/messages HIT ===", flush=True)
     try:
         body = await req.json()
         activity = Activity().deserialize(body)
