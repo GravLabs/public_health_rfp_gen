@@ -36,7 +36,19 @@ az bot update \
   --output none
 echo "  ✓ Bot Service endpoint updated"
 
-# MICROSOFT_APP_ID, MICROSOFT_APP_PASSWORD, MICROSOFT_APP_TYPE are injected via Bicep env vars
+# Bicep @secure() params don't propagate from AZD env — set MICROSOFT_APP_PASSWORD directly
+API_APP_NAME=$(az containerapp list \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "[?tags.\"azd-service-name\"=='api'].name | [0]" \
+  -o tsv 2>/dev/null || echo "")
+BOT_APP_SECRET=$(azd env get-value BOT_APP_SECRET 2>/dev/null || echo "")
+if [ -n "$BOT_APP_SECRET" ] && [ -n "$API_APP_NAME" ]; then
+  az containerapp update \
+    --name "$API_APP_NAME" \
+    --resource-group "$RESOURCE_GROUP" \
+    --set-env-vars "MICROSOFT_APP_PASSWORD=$BOT_APP_SECRET" \
+    --output none 2>/dev/null && echo "  ✓ MICROSOFT_APP_PASSWORD set on API container"
+fi
 
 # Persist the messaging endpoint for reference
 azd env set BOT_MESSAGING_ENDPOINT "$MESSAGING_ENDPOINT"
