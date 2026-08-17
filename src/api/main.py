@@ -346,13 +346,20 @@ async def foundry_info():
 @app.post("/api/messages", summary="Teams Bot webhook")
 async def messages(req: Request) -> Response:
     """Bot Framework webhook — receives all Teams channel activities."""
-    body = await req.json()
-    activity = Activity().deserialize(body)
-    auth_header = req.headers.get("Authorization", "")
-    response = await _bot_adapter.process_activity(activity, auth_header, RfpBotHandler().on_turn)
-    if response:
-        return Response(content=str(response.body), media_type="application/json", status_code=response.status)
-    return Response(status_code=201)
+    try:
+        body = await req.json()
+        activity = Activity().deserialize(body)
+        auth_header = req.headers.get("Authorization", "")
+        log.info("Received activity type=%s from=%s auth=%s",
+                 body.get("type"), body.get("from", {}).get("id", "?"),
+                 "present" if auth_header else "missing")
+        response = await _bot_adapter.process_activity(activity, auth_header, RfpBotHandler().on_turn)
+        if response:
+            return Response(content=str(response.body), media_type="application/json", status_code=response.status)
+        return Response(status_code=201)
+    except Exception as exc:
+        log.exception("Bot adapter error: %s", exc)
+        return Response(status_code=200)  # return 200 so Teams retries cleanly
 
 
 @app.get("/health", response_model=HealthResponse, summary="Health check")
