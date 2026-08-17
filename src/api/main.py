@@ -51,6 +51,7 @@ credential = DefaultAzureCredential()
 _bot_adapter = BotFrameworkAdapter(BotFrameworkAdapterSettings(
     app_id=os.getenv("MICROSOFT_APP_ID", ""),
     app_password=os.getenv("MICROSOFT_APP_PASSWORD", ""),
+    channel_auth_tenant=os.getenv("MICROSOFT_APP_TENANT_ID", ""),
 ))
 
 _sp_client: Optional[SharePointClient] = None
