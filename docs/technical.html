@@ -752,7 +752,7 @@ flowchart TD
           <tr>
             <td>RFP section generation</td>
             <td><code>gpt-4o</code> (fine-tuned)</td>
-            <td>Creative, long-form drafting; fine-tuned on historical APHL RFPs for domain vocabulary and structure</td>
+            <td>Creative, long-form drafting; fine-tuned on historical historical RFPs for domain vocabulary and structure</td>
           </tr>
           <tr>
             <td>Groundedness scoring</td>
@@ -782,7 +782,7 @@ flowchart TD
           <tr>
             <td>Embeddings (retrieval)</td>
             <td><code>text-embedding-3-large</code></td>
-            <td>1536-dim vectors; best recall on public health domain corpus in APHL benchmarks</td>
+            <td>1536-dim vectors; best recall on public health domain corpus in internal benchmarks</td>
           </tr>
         </tbody>
       </table>
@@ -815,7 +815,7 @@ model_config = {
 evaluator = GroundednessEvaluator(model_config=model_config)</code></pre>
 
     <h3>Estimated cost impact</h3>
-    <p>Eval gate runs on every generated RFP (~8 sections × 5 evaluators). Routing groundedness and coherence to gpt-4o-mini reduces evaluation cost by approximately <strong>93%</strong> vs. running all evaluation on GPT-4o, with no measurable change in gate accuracy on the APHL eval corpus.</p>
+    <p>Eval gate runs on every generated RFP (~8 sections × 5 evaluators). Routing groundedness and coherence to gpt-4o-mini reduces evaluation cost by approximately <strong>93%</strong> vs. running all evaluation on GPT-4o, with no measurable change in gate accuracy on the evaluation corpus.</p>
 
     <h3>Section-tiered generation</h3>
     <p>Not all 8 RFP sections require the fine-tuned GPT-4o. Three boilerplate sections — <code>reporting_requirements</code>, <code>budget_requirements</code>, and <code>submission_instructions</code> — contain templated, formula-driven content (CFR citations, portal deadlines, allowable cost lists) that gpt-4o-mini produces equivalently at ~15× lower cost. The remaining five sections (Background, Funding Parameters, Eligibility, Scope of Work, Evaluation Criteria) stay on the fine-tuned model where domain grounding matters.</p>
@@ -853,7 +853,7 @@ evaluator = GroundednessEvaluator(model_config=model_config)</code></pre>
     """</span>;</code></pre>
 
     <h3>Embedding model</h3>
-    <p>Retrieval uses <code>text-embedding-3-small</code> instead of <code>text-embedding-3-large</code> — 5× cheaper with ~3% quality difference on standard retrieval benchmarks. Benchmark against the full APHL corpus before upgrading to large in production if recall drops measurably.</p>
+    <p>Retrieval uses <code>text-embedding-3-small</code> instead of <code>text-embedding-3-large</code> — 5× cheaper with ~3% quality difference on standard retrieval benchmarks. Benchmark against the full corpus before upgrading to large in production if recall drops measurably.</p>
   </section>
 
   <!-- ── Agent Topology ─────────────────────────────────────────────────────── -->

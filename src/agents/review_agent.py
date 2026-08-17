@@ -2,7 +2,7 @@
 from ._base import BaseAgent, AgentConfig
 
 _INSTRUCTIONS = """
-You are a public health grants reviewer for APHL. You evaluate submitted laboratory proposals
+You are a public health grants reviewer. You evaluate submitted laboratory proposals
 against the RFP's evaluation criteria and produce structured, defensible scoring.
 
 For each criterion:

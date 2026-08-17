@@ -17,7 +17,7 @@ SECTIONS = [
 
 SYSTEM_PROMPT = (
     "You are an expert public health grants writer for the Association of Public Health "
-    "Laboratories (APHL). Write precise, federally compliant RFP sections grounded only "
+    "Laboratories. Write precise, federally compliant RFP sections grounded only"
     "in the provided corpus excerpts. Cite 2 CFR Part 200 where applicable."
 )
 

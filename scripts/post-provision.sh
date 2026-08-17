@@ -65,11 +65,11 @@ if [ -f "src/ingestion/create_index.py" ]; then
 
   echo "      Installing ingestion dependencies..."
   # --target avoids needing python3-venv and bypasses externally-managed-environment
-  pip3 install --target /tmp/aphl-ingest-deps -r src/ingestion/requirements.txt -q 2>/dev/null || \
-    pip3 install --target /tmp/aphl-ingest-deps -r src/ingestion/requirements.txt -q
-  PYTHONPATH="/tmp/aphl-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/create_index.py
+  pip3 install --target /tmp/pubhealth-ingest-deps -r src/ingestion/requirements.txt -q 2>/dev/null || \
+    pip3 install --target /tmp/pubhealth-ingest-deps -r src/ingestion/requirements.txt -q
+  PYTHONPATH="/tmp/pubhealth-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/create_index.py
   # pipeline.py imports local siblings (document_parser, chunker, indexer) via PYTHONPATH
-  PYTHONPATH="/tmp/aphl-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/pipeline.py
+  PYTHONPATH="/tmp/pubhealth-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/pipeline.py
 else
   echo "      ⚠ src/ingestion/create_index.py not found — skipping ingestion"
 fi

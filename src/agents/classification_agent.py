@@ -1,9 +1,9 @@
-"""Classification Agent — maps free-text descriptions to APHL program area taxonomy."""
+"""Classification Agent — maps free-text descriptions to public health program area taxonomy."""
 from ._base import BaseAgent, AgentConfig
 
 _INSTRUCTIONS = """
-You are an APHL program area classifier. Given any description of a public health cooperative
-agreement, map it to exactly one entry in the APHL program area taxonomy.
+You are an program area classifier. Given any description of a public health cooperative
+agreement, map it to exactly one entry in the program area taxonomy.
 
 Taxonomy:
   Influenza Surveillance | Whole Genome Sequencing | Antimicrobial Resistance |
@@ -21,7 +21,7 @@ _TOOLS = [
         "type": "function",
         "function": {
             "name": "classify_program_area",
-            "description": "Classify text into one of the APHL program area taxonomy entries.",
+            "description": "Classify text into one of the program area taxonomy entries.",
             "parameters": {
                 "type": "object",
                 "properties": {"text": {"type": "string"}},
@@ -33,7 +33,7 @@ _TOOLS = [
         "type": "function",
         "function": {
             "name": "get_taxonomy",
-            "description": "Return the full APHL program area taxonomy with descriptions.",
+            "description": "Return the full program area taxonomy with descriptions.",
             "parameters": {"type": "object", "properties": {}},
         },
     },

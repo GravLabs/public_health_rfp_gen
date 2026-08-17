@@ -1,4 +1,4 @@
-"""Shared base for all APHL specialist agents."""
+"""Shared base for all public health RFP specialist agents."""
 from __future__ import annotations
 from dataclasses import dataclass, field
 from azure.ai.projects import AIProjectClient

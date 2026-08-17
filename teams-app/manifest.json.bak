@@ -2,13 +2,13 @@
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
   "manifestVersion": "1.17",
   "version": "1.0.0",
-  "id": "${{MICROSOFT_APP_ID}}",
-  "packageName": "com.graviton.pubhealth.rfp",
+  "id": "bc01af2c-0d0d-4bb8-a1d7-dfbb5e0833f0",
+  "packageName": "com.aphl.pubhealth.rfp",
   "developer": {
-    "name": "Graviton Labs",
-    "websiteUrl": "https://www.graviton-labs.com",
-    "privacyUrl": "https://www.graviton-labs.com/privacy",
-    "termsOfUseUrl": "https://www.graviton-labs.com/terms"
+    "name": "APHL / Graviton Labs",
+    "websiteUrl": "https://www.aphl.org",
+    "privacyUrl": "https://www.aphl.org/privacy",
+    "termsOfUseUrl": "https://www.aphl.org/terms"
   },
   "icons": {
     "color": "color.png",
@@ -19,13 +19,13 @@
     "full": "Public Health RFP Generator"
   },
   "description": {
-    "short": "AI-powered RFP generation for member laboratories",
-    "full": "Generate, review, and manage public health laboratory RFPs using AI grounded on a cooperative agreement corpus. Drafts are evaluated against 5 quality dimensions before being saved to SharePoint."
+    "short": "AI-powered RFP generation for APHL member laboratories",
+    "full": "Generate, review, and manage public health laboratory RFPs using AI grounded on the APHL cooperative agreement corpus. Drafts are evaluated against 5 quality dimensions before being saved to SharePoint."
   },
   "accentColor": "#0369A1",
   "bots": [
     {
-      "botId": "${{MICROSOFT_APP_ID}}",
+      "botId": "bc01af2c-0d0d-4bb8-a1d7-dfbb5e0833f0",
       "scopes": ["personal", "team", "groupchat"],
       "supportsFiles": false,
       "isNotificationOnly": false,
@@ -47,7 +47,5 @@
     }
   ],
   "permissions": ["identity", "messageTeamMembers"],
-  "validDomains": [
-    "ca-pubhealth-api-2gdlihbjsb5rk.wittysmoke-fc94257b.eastus.azurecontainerapps.io"
-  ]
+  "validDomains": []
 }

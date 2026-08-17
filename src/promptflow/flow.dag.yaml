@@ -1,7 +1,7 @@
 $schema: https://azuremlschemas.azureedge.net/promptflow/latest/Flow.schema.json
 name: pubhealth-rfp-generation
 description: >
-  End-to-end RFP generation flow for APHL member laboratories.
+  End-to-end RFP generation flow for member laboratories.
   Classifies program area, retrieves grounding context from AI Search,
   generates all 8 RFP sections, then evaluates quality across 5 dimensions.
 

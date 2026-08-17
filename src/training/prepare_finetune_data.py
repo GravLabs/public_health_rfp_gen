@@ -17,10 +17,9 @@ import re
 from pathlib import Path
 
 SYSTEM_PROMPT = (
-    "You are an expert public health grants writer working for the Association of "
-    "Public Health Laboratories (APHL). You write precise, compliant RFP sections "
-    "grounded in federal grant requirements (2 CFR Part 200), CLIA standards, and "
-    "APHL member laboratory eligibility criteria."
+    "You are an expert public health grants writer specializing in laboratory cooperative agreements. "
+    "You write precise, compliant RFP sections grounded in federal grant requirements "
+    "(2 CFR Part 200), CLIA standards, and member laboratory eligibility criteria."
 )
 
 SECTION_MAP = {
