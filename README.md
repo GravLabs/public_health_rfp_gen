@@ -11,17 +11,17 @@
 
 | Audience | Document |
 |---|---|
-| Anyone setting up for the first time | [Setup Quickstart](https://gravlabs.github.io/public_health_rfp_gen/quickstart.html) |
-| Program Officers, Grants Administrators, Compliance Officers | [Business Overview](https://gravlabs.github.io/public_health_rfp_gen/business.html) |
+| First-time setup | [Setup Quickstart](https://gravlabs.github.io/public_health_rfp_gen/quickstart.html) |
+| Program Officers, Grants Administrators | [Business Overview](https://gravlabs.github.io/public_health_rfp_gen/business.html) |
 | Engineers and Cloud Architects | [Technical Architecture Reference](https://gravlabs.github.io/public_health_rfp_gen/technical.html) |
 
 ---
 
 ## What It Does
 
-Program officers describe an RFP in plain language in Microsoft Teams. The platform retrieves relevant historical awards from AI Search, generates all 8 required sections via GPT-4o, and runs a 5-dimension evaluation gate before the user approves it for upload to SharePoint as a formatted Word document. The full cycle takes minutes instead of weeks.
+Program officers describe an RFP in plain language in Microsoft Teams. The platform retrieves relevant historical awards from AI Search, generates all 8 required sections via GPT-4o, and runs a 5-dimension evaluation gate. When the draft passes, the user clicks **Approve & Save to SharePoint** — the bot assembles a formatted Word document and uploads it directly. The full cycle takes minutes instead of weeks.
 
-**Five bot capabilities** — all accessible from Teams:
+**Five capabilities, all from Teams:**
 
 | Capability | Sample prompt |
 |---|---|
@@ -31,77 +31,13 @@ Program officers describe an RFP in plain language in Microsoft Teams. The platf
 | **Budget audit** | Paste a budget narrative with a dollar amount |
 | **Regulatory watch** | `Any recent CFR changes affecting public health labs?` |
 
-After an RFP passes the evaluation gate, an **Approve & Save to SharePoint** button appears in the card. Clicking it uploads a properly-formatted Word document (headings, bullet lists, tables) to the `GeneratedDrafts` folder in SharePoint and returns a direct link.
-
 ---
 
-## Prerequisites
+## Install
 
-Install all tools before running `azd up`. On Windows, use PowerShell unless otherwise noted.
+**Prerequisites:** az CLI ≥ 2.60, azd ≥ 1.9, .NET SDK 8, Python 3.12, Docker Desktop.
 
-### Azure CLI
-```bash
-# Linux/macOS
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
-# Windows (PowerShell)
-winget install Microsoft.AzureCLI
-
-# Verify
-az version   # need >= 2.60
-```
-
-### Azure Developer CLI (azd)
-```bash
-# Linux/macOS
-curl -fsSL https://aka.ms/install-azd.sh | bash
-
-# Windows (PowerShell)
-winget install Microsoft.Azd
-
-# Verify
-azd version   # need >= 1.9
-```
-
-### .NET SDK 8
-```bash
-# Linux
-wget https://dot.net/v1/dotnet-install.sh && bash dotnet-install.sh --channel 8.0
-
-# Windows
-winget install Microsoft.DotNet.SDK.8
-
-# Verify
-dotnet --version   # need 8.x
-```
-
-### Python 3.12
-```bash
-# Ubuntu/Debian
-sudo apt install python3.12 python3.12-venv python3-pip -y
-
-# macOS
-brew install python@3.12
-
-# Windows
-winget install Python.Python.3.12
-
-# Verify
-python3 --version   # need 3.12.x
-```
-
-### Docker Desktop
-Download from https://www.docker.com/products/docker-desktop and install. Required to build container images.
-
-```bash
-docker info   # must show server running
-```
-
----
-
-## Deploy to Azure
-
-### Guided install (recommended)
+### Guided (recommended)
 
 ```bash
 git clone https://github.com/GravLabs/public_health_rfp_gen.git
@@ -109,43 +45,31 @@ cd public_health_rfp_gen
 bash scripts/install.sh
 ```
 
-The installer walks through all six phases interactively — prerequisites, subscription selection, `azd up`, bot credentials, Teams app upload, and SharePoint access. Resume a failed run from any phase with `--from N` (e.g. `bash scripts/install.sh --from 4`).
+Walks through all six phases interactively: prerequisites check → login & subscription → `azd up` → bot credentials → Teams app upload → SharePoint access. Resume from any phase with `--from N`.
 
-### Manual install
+### Manual
 
 ```bash
-git clone https://github.com/GravLabs/public_health_rfp_gen.git
-cd public_health_rfp_gen
+az login && azd auth login
 
-# Authenticate
-az login
-azd auth login
-
-# Select subscription
 az account set --subscription "<subscription-id>"
-azd env set AZURE_SUBSCRIPTION_ID "<subscription-id>"
 
-# Create environment and set required variables
 azd env new pubhealth-rfp-poc
+azd env set AZURE_SUBSCRIPTION_ID "<subscription-id>"
 azd env set AZURE_LOCATION eastus
-azd env set APIM_PUBLISHER_EMAIL "your-email@example.com"
-azd env set OWNER_EMAIL "your-email@example.com"
+azd env set APIM_PUBLISHER_EMAIL "you@example.com"
+azd env set OWNER_EMAIL "you@example.com"
 
-# Deploy (provision + build containers + post-provision hook ~20 min)
-azd up
+azd up   # ~20 min
 ```
 
-See [docs/quickstart.html](docs/quickstart.html) for a step-by-step guide with copy-pasteable commands for all phases.
+See [docs/quickstart.html](docs/quickstart.html) for copy-pasteable commands covering all phases including bot setup, Teams manifest, and SharePoint permissions.
 
-`azd up` runs in three phases:
+> **Use `azd deploy` for code changes, not `azd provision`.** Provision re-runs Bicep and can reset secure params. The post-provision hook restores the bot App ID, but deploy is faster and safer.
 
-1. **Provision** — creates all Azure resources via Bicep (~15 min)
-2. **Deploy** — builds and pushes Docker images for the API and orchestrator
-3. **Post-provision hook** — uploads the 50-RFP corpus, creates the AI Search index, runs ingestion, writes `.env`, wires AI Foundry env vars, restores bot App ID
+---
 
-> **After `azd up`**: Use `azd deploy` (not `azd provision`) for all subsequent code changes. Running `azd provision` re-runs Bicep and may reset secure params; the `post-provision.sh` hook restores the bot App ID automatically, but it is slower than `azd deploy`.
-
-### What `azd up` provisions
+## What `azd up` Provisions
 
 | Resource | Name pattern | Purpose |
 |---|---|---|
@@ -153,160 +77,26 @@ See [docs/quickstart.html](docs/quickstart.html) for a step-by-step guide with c
 | User-Assigned Identity | `id-pubhealth-*` | Keyless auth across all services |
 | Key Vault | `kvph*` | Secrets storage |
 | Storage Account | `stpubhealth*` | ADLS Gen2 for RFP corpus |
-| ML Storage Account | `stml*` | Standard storage for AI Foundry |
 | Azure OpenAI | `cog-pubhealth-oai-*` | GPT-4o, gpt-4o-mini, text-embedding-3-small |
 | Document Intelligence | `cog-pubhealth-di-*` | PDF/DOCX parsing |
 | AI Search | `srch-pubhealth-*` | Hybrid + semantic search index |
-| Log Analytics | `log-pubhealth-*` | Centralized logs |
-| Application Insights | `appi-pubhealth-*` | Request tracing + metrics |
 | API Management | `apim-pubhealth-*` | AI gateway (Consumption SKU) |
 | Container Registry | `crpubhealth*` | Docker image storage |
-| Container Apps Environment | `cae-pubhealth-*` | Hosting for API + orchestrator |
+| Container Apps Environment | `cae-pubhealth-*` | API + orchestrator hosting |
 | AI Foundry Hub + Project | `mlw-pubhealth-hub/rfp-*` | AI Foundry project workspace |
 | Bot Service | `bot-pubhealth-rfp-*` | Teams channel relay |
+| Log Analytics + App Insights | `log-` / `appi-pubhealth-*` | Logs and traces |
 | Budget Alert | `pubhealth-rfp-poc-budget` | $500/mo spend guard |
-
----
-
-## Teams Bot Setup
-
-The bot requires a one-time App Registration and manifest install that is not automated by `azd up`.
-
-### 1. Create App Registration
-
-```bash
-# Create a new App Registration for the bot
-az ad app create --display-name "pubhealth-rfp-bot" \
-  --sign-in-audience AzureADMyOrg
-
-# Note the appId from the output, then create a secret:
-az ad app credential reset --id <appId> --years 2
-# Note the password from the output
-```
-
-### 2. Set Bot Credentials
-
-```bash
-azd env set BOT_APP_SECRET "<password-from-above>"
-
-# Then update the API container with the bot credentials
-RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
-API_APP_NAME=$(az containerapp list -g $RESOURCE_GROUP \
-  --query "[?tags.\"azd-service-name\"=='api'].name|[0]" -o tsv)
-CURRENT_IMAGE=$(az containerapp show -n $API_APP_NAME -g $RESOURCE_GROUP \
-  --query "properties.template.containers[0].image" -o tsv)
-
-az containerapp update -n $API_APP_NAME -g $RESOURCE_GROUP \
-  --image "$CURRENT_IMAGE" \
-  --set-env-vars \
-    "MICROSOFT_APP_ID=<appId>" \
-    "MICROSOFT_APP_PASSWORD=<password>" \
-  --revision-suffix botinit --output none
-```
-
-### 3. Update Bot Service
-
-```bash
-BOT_NAME=$(az bot show -g $RESOURCE_GROUP --query "name" -o tsv 2>/dev/null || \
-           az resource list -g $RESOURCE_GROUP --resource-type Microsoft.BotService/botServices \
-             --query "[0].name" -o tsv)
-API_FQDN=$(az containerapp show -n $API_APP_NAME -g $RESOURCE_GROUP \
-  --query "properties.configuration.ingress.fqdn" -o tsv)
-
-az bot update -g $RESOURCE_GROUP -n $BOT_NAME \
-  --endpoint "https://$API_FQDN/api/messages"
-```
-
-### 4. Install the Teams App
-
-```bash
-cd teams-app
-# Update manifest.json: set "id" and "botId" to your appId
-# Then rebuild the ZIP:
-zip -j pubhealth-rfp-bot.zip manifest.json color.png outline.png
-```
-
-Upload `pubhealth-rfp-bot.zip` via **Teams Admin Center → Manage apps → Upload** or via **Teams → Apps → Upload a custom app**.
-
-### 5. Grant SharePoint Permission
-
-For the Approve & Save to SharePoint flow, the managed identity needs Graph access:
-
-```bash
-MI_OBJECT_ID=$(az identity show -g $RESOURCE_GROUP \
-  --name "id-pubhealth-*" --query principalId -o tsv)
-GRAPH_SP=$(az ad sp show --id 00000003-0000-0000-c000-000000000000 --query id -o tsv)
-ROLE_ID="9492366f-7969-46a4-8d15-ed1a20078fff"  # Sites.ReadWrite.All
-
-az rest --method POST \
-  --url "https://graph.microsoft.com/v1.0/servicePrincipals/$MI_OBJECT_ID/appRoleAssignments" \
-  --body "{\"principalId\":\"$MI_OBJECT_ID\",\"resourceId\":\"$GRAPH_SP\",\"appRoleId\":\"$ROLE_ID\"}"
-```
-
-Then set the SharePoint site ID on the container:
-
-```bash
-az containerapp update -n $API_APP_NAME -g $RESOURCE_GROUP \
-  --image "$CURRENT_IMAGE" \
-  --set-env-vars \
-    "SHAREPOINT_SITE_ID=<tenant>.sharepoint.com,<site-guid>,<web-guid>" \
-    "SHAREPOINT_DRAFT_LIBRARY=Generated Drafts" \
-  --revision-suffix sharepointinit --output none
-```
-
----
-
-## Manual Steps After `azd up`
-
-### AI Foundry Connections (optional — for fine-tuning and eval runs)
-
-The hub is provisioned. To wire OpenAI and AI Search connections for use in AI Foundry Studio:
-
-1. Open [AI Foundry Studio](https://ai.azure.com)
-2. Select the `mlw-pubhealth-hub-*` hub
-3. Go to **Settings → Connections → New connection**
-4. Add Azure OpenAI: endpoint from `azd env get-value AZURE_OPENAI_ENDPOINT`
-5. Add Azure AI Search: endpoint from `azd env get-value AZURE_SEARCH_ENDPOINT`
-6. Set auth type to **Managed Identity** on both
-
-### Fabric Setup (optional — requires 60-day trial activation)
-
-```bash
-python fabric/setup.py \
-  --workspace-name pubhealth-rfp-poc \
-  --ai-search-endpoint "$(azd env get-value AZURE_SEARCH_ENDPOINT)" \
-  --sharepoint-site-id "<YOUR_SITE_ID>"
-```
-
-### APIM Advanced Policies (requires Standard v2 tier)
-
-Token limiting, semantic caching, and token metric emission are not available in the Consumption SKU. To enable:
-
-1. Upgrade APIM to Standard v2 (~$140/mo) in the Azure Portal
-2. Restore the full policy XML from git history (commit before `e144e0e`)
 
 ---
 
 ## Teardown
 
 ```bash
-# Linux/macOS
-./scripts/teardown.sh
-
-# Windows (PowerShell)
-.\scripts\teardown.ps1
+bash scripts/teardown.sh
 ```
 
-Runs `azd down --force --purge`, purges soft-deleted Cognitive Services accounts, and optionally removes local `.azure/<env>` state.
-
-> After teardown, re-create the environment before redeploying:
-> ```bash
-> azd env new <env-name>
-> azd env set AZURE_LOCATION eastus
-> azd env set APIM_PUBLISHER_EMAIL your@email.com
-> azd env set OWNER_EMAIL your@email.com
-> azd up
-> ```
+Runs `azd down --force --purge`, purges soft-deleted Cognitive Services, and optionally removes local `.azure/<env>` state.
 
 ---
 
@@ -314,66 +104,31 @@ Runs `azd down --force --purge`, purges soft-deleted Cognitive Services accounts
 
 After `azd up`, `.env` is written to the project root. Source it before local runs.
 
-### API (FastAPI)
-
 ```bash
-cd src/api
-python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+# API (FastAPI)
+cd src/api && python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
-```
 
-### Orchestrator (.NET Semantic Kernel)
+# Orchestrator (.NET)
+cd src/orchestrator && dotnet restore && dotnet run
 
-```bash
-cd src/orchestrator
-dotnet restore
-dotnet run
-```
-
-### Ingestion pipeline (re-index)
-
-```bash
-cd src/ingestion
-python3 -m venv .venv && source .venv/bin/activate
+# Re-index corpus
+cd src/ingestion && python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+python create_index.py && python pipeline.py
 
-export AZURE_SEARCH_ENDPOINT="$(azd env get-value AZURE_SEARCH_ENDPOINT)"
-export AZURE_OPENAI_ENDPOINT="$(azd env get-value AZURE_OPENAI_ENDPOINT)"
-export AZURE_STORAGE_ACCOUNT="$(azd env get-value AZURE_STORAGE_ACCOUNT)"
-
-python create_index.py     # create/update search index schema
-python pipeline.py         # ingest all blobs from rfp-corpus container
-```
-
-### Evaluation gate
-
-```bash
-cd src/evaluation
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python gate.py --draft-file <path-to-draft.md>
-```
-
-### Tests
-
-```bash
-cd tests
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements-test.txt
-pytest -v
+# Tests
+cd tests && pip install -r requirements-test.txt && pytest -v
 ```
 
 ---
 
 ## Environment Variables
 
-`azd up` writes `.env` to the project root. Key variables:
-
-| Variable | Source | Used by |
+| Variable | Value / Source | Used by |
 |---|---|---|
-| `AZURE_SUBSCRIPTION_ID` | Selected subscription | azd provision target |
+| `AZURE_SUBSCRIPTION_ID` | Selected subscription ID | azd provision target |
 | `AZURE_OPENAI_ENDPOINT` | OpenAI resource | API, ingestion, evaluation |
 | `AZURE_OPENAI_GPT_DEPLOYMENT` | `gpt-4o` | API, orchestrator |
 | `AZURE_OPENAI_MINI_DEPLOYMENT` | `gpt-4o-mini` | Evaluators, classification |
@@ -382,7 +137,6 @@ pytest -v
 | `AZURE_STORAGE_ACCOUNT` | Storage account name | Post-provision, ingestion |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | App Insights | API, orchestrator |
 | `AZURE_AI_FOUNDRY_PROJECT_ENDPOINT` | `https://eastus.api.azureml.ms` | AI Foundry tracing |
-| `AZURE_AI_FOUNDRY_PROJECT_NAME` | `mlw-pubhealth-rfp-*` | AI Foundry project |
 | `MICROSOFT_APP_ID` | Bot App Registration | Bot auth |
 | `MICROSOFT_APP_PASSWORD` | Bot App Registration secret | Bot auth |
 | `SHAREPOINT_SITE_ID` | SharePoint site | Draft upload |
@@ -396,9 +150,10 @@ pytest -v
 .
 ├── data/
 │   ├── sample-rfps/         # 50 synthetic RFP documents (Markdown)
-│   ├── eval-examples/       # Labeled good/bad evaluation examples
-│   └── golden-annotated/    # Human-annotated golden dataset (generated)
+│   ├── eval-examples/       # Labeled evaluation examples
+│   └── golden-annotated/    # Human-annotated golden dataset
 ├── docs/
+│   ├── quickstart.html      # Interactive setup guide (GitHub Pages)
 │   ├── business.html        # Business overview (GitHub Pages)
 │   └── technical.html       # Technical architecture reference (GitHub Pages)
 ├── fabric/
@@ -406,31 +161,24 @@ pytest -v
 │   └── eval_analytics.ipynb # Spark notebook → 6 Power BI Delta tables
 ├── infra/
 │   ├── main.bicep           # Root Bicep (subscription scope)
-│   └── modules/             # 14 modules (identity, openai, ai-search,
-│                            #   ai-foundry, container-apps, apim,
-│                            #   bot-service, monitoring, keyvault,
-│                            #   storage, doc-intelligence, budget, ...)
+│   └── modules/             # 14 resource modules
 ├── scripts/
 │   ├── install.sh           # Guided interactive installer (all 6 phases)
 │   ├── verify-setup.sh      # Post-install health check + smoke test
 │   ├── post-provision.sh    # azd post-provision hook (7 steps)
-│   ├── post-deploy.sh       # azd post-deploy hook (bot endpoint + password)
-│   └── load-env-vars.sh     # Load .env into azd environment
+│   ├── post-deploy.sh       # azd post-deploy hook
+│   └── teardown.sh          # Full resource teardown
 ├── src/
-│   ├── api/                 # FastAPI service + Teams bot handler
-│   │   ├── main.py          # 10 endpoints + /export SharePoint upload
+│   ├── api/                 # FastAPI + Teams bot handler
+│   │   ├── main.py          # Endpoints including POST /export/{draft_id}
 │   │   ├── bot/bot.py       # 5 capability handlers + Adaptive Card builders
-│   │   └── sharepoint_client.py  # Graph API: upload DOCX with MD→Word conversion
-│   ├── evaluation/          # 5-dimension evaluation gate (no SDK dependency)
-│   │   ├── gate.py          # Orchestrator — PASS/FAIL decision
-│   │   └── evaluators/      # completeness, param_accuracy, compliance,
-│   │                        #   groundedness, coherence (direct httpx calls)
-│   ├── orchestrator/        # Semantic Kernel (.NET) — 8-section streaming generator
+│   │   └── sharepoint_client.py  # Graph API upload with MD→Word conversion
+│   ├── evaluation/          # 5-dimension gate (direct httpx, no SDK)
+│   ├── orchestrator/        # Semantic Kernel (.NET) — 8-section streaming
 │   ├── ingestion/           # AI Search indexing pipeline
-│   ├── agents/              # Azure AI Foundry Agent Service
-│   └── training/            # Fine-tuning data prep
+│   └── agents/              # Azure AI Foundry Agent Service
 ├── teams-app/
-│   ├── manifest.json        # Teams app manifest (supportsFiles: true)
+│   ├── manifest.json        # Teams app manifest
 │   └── pubhealth-rfp-bot.zip
 └── tests/                   # Pytest suite
 ```
@@ -439,20 +187,10 @@ pytest -v
 
 ## Adapting for Your Organization
 
-1. **Replace the corpus** — swap `data/sample-rfps/` with your historical RFP documents and re-run the ingestion pipeline
-2. **Tune thresholds** — edit the `THRESHOLDS` dict in `src/evaluation/gate.py`
-3. **Add compliance rules** — extend `src/evaluation/evaluators/compliance.py` with required phrases or prohibited terms
-4. **Change program taxonomy** — update `_TAXONOMY` in `src/api/main.py` and the orchestrator system prompt
-
----
-
-## Contributing
-
-Pull requests welcome. For major changes, open an issue first. Areas where contributions are especially useful:
-
-- Additional evaluator dimensions (readability, format compliance)
-- Power BI report templates for the Fabric Delta tables
-- Additional synthetic RFP examples for new program areas
+1. **Replace the corpus** — swap `data/sample-rfps/` with your RFP documents and re-run ingestion
+2. **Tune thresholds** — edit `THRESHOLDS` in `src/evaluation/gate.py`
+3. **Add compliance rules** — extend `src/evaluation/evaluators/compliance.py`
+4. **Change program taxonomy** — update `_TAXONOMY` in `src/api/main.py`
 
 ---
 
