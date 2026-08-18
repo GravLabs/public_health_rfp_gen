@@ -557,9 +557,19 @@ cd ..</pre><button class="copy-btn">copy</button></div>
       <input type="checkbox" class="step-cb" id="p4-upload" data-phase="4">
       <div class="step-body">
         <div class="step-label">Upload to Teams</div>
-        <div class="step-desc">Two options depending on your tenant permissions:</div>
-        <div class="step-desc"><strong>Option A — Teams Admin Center</strong> (if you have admin access): go to <em>Teams Admin Center → Manage apps → Upload new app</em>, upload <code>pubhealth-rfp-bot.zip</code>.</div>
-        <div class="step-desc"><strong>Option B — Sideload</strong> (if custom app upload is enabled): in Teams, go to <em>Apps → Upload a custom app</em>, select <code>pubhealth-rfp-bot.zip</code>.</div>
+        <div class="step-desc">Two options depending on your tenant permissions. Use Option A if you have Teams admin access (recommended for org-wide deploy).</div>
+        <div class="step-desc"><strong>Option A — Teams Admin Center</strong></div>
+        <div class="step-desc" style="padding-left:1rem">
+          1. Go to <a href="https://admin.teams.microsoft.com/policies/manage-apps" target="_blank" rel="noopener">admin.teams.microsoft.com → Manage apps</a><br>
+          2. Click <strong>Upload new app</strong> (top-right)<br>
+          3. Select <code>teams-app/pubhealth-rfp-bot.zip</code> and confirm<br>
+          4. Search for <em>Public Health RFP</em> in the app list — set <strong>Status → Allowed</strong> if it shows as Blocked<br>
+          5. To make it available to specific users: go to <em>Setup policies → Global</em>, add the app to pinned or installed apps
+        </div>
+        <div class="step-desc" style="margin-top:0.75rem"><strong>Option B — Sideload</strong> (if custom app upload is enabled for your account)</div>
+        <div class="step-desc" style="padding-left:1rem">
+          In Teams: <em>Apps → Manage your apps → Upload an app</em>, select <code>teams-app/pubhealth-rfp-bot.zip</code>
+        </div>
       </div>
     </div>
 
@@ -567,9 +577,13 @@ cd ..</pre><button class="copy-btn">copy</button></div>
       <input type="checkbox" class="step-cb" id="p4-chat" data-phase="4">
       <div class="step-body">
         <div class="step-label">Open the bot in Teams and send a ping</div>
-        <div class="step-desc">Search for <em>RFP Generator Bot</em> in Teams → Apps → open a chat. Send <code>hi</code>. The bot should respond with its capability menu. If you see nothing after 10 seconds, check the API container logs.</div>
-        <div class="code-wrap"><pre># Tail API container logs if the bot doesn't respond
-az containerapp logs show -n $API_APP -g $RG --follow</pre><button class="copy-btn">copy</button></div>
+        <div class="step-desc">In Teams, go to <em>Apps</em> and search for <strong>Public Health RFP Bot</strong>. Click <em>Add</em> → open a chat with it. Send <code>hi</code> — the bot should respond with its capability menu within a few seconds.</div>
+        <div class="step-desc">If the bot doesn't respond after 30 seconds, tail the API container logs:</div>
+        <div class="code-wrap"><pre>az containerapp logs show \
+  -n ca-pubhealth-api-&lt;token&gt; \
+  -g rg-pubhealth-rfp-poc-&lt;token&gt; \
+  --tail 50</pre><button class="copy-btn">copy</button></div>
+        <div class="step-desc" style="margin-top:0.5rem">Common causes: bot App ID mismatch (re-run Phase 3), container still starting (wait 60 s), or Teams app not allowed in Admin Center (set Status → Allowed).</div>
       </div>
     </div>
   </section>
