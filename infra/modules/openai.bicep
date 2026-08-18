@@ -39,10 +39,27 @@ resource gptDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10
   }
 }
 
+resource miniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
+  parent: openAi
+  name: 'gpt-4o-mini'
+  dependsOn: [gptDeployment]
+  sku: {
+    name: 'GlobalStandard'
+    capacity: 30
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'gpt-4o-mini'
+      version: '2024-07-18'
+    }
+  }
+}
+
 resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: openAi
   name: embeddingModelName
-  dependsOn: [gptDeployment]
+  dependsOn: [miniDeployment]
   sku: {
     name: 'Standard'
     capacity: 30

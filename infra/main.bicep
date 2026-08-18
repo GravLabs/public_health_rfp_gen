@@ -151,7 +151,7 @@ module containerApps 'modules/container-apps.bicep' = {
       { name: 'AZURE_CLIENT_ID', value: identity.outputs.clientId }
       { name: 'AZURE_OPENAI_ENDPOINT', value: openAi.outputs.endpoint }
       { name: 'AZURE_OPENAI_GPT_DEPLOYMENT', value: openAiModelName }
-      { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o' }
+      { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o-mini' }
       { name: 'AZURE_SEARCH_ENDPOINT', value: search.outputs.endpoint }
       { name: 'AZURE_SEARCH_INDEX', value: 'pubhealth-rfp-index' }
       { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: monitoring.outputs.appInsightsConnectionString }
@@ -161,7 +161,7 @@ module containerApps 'modules/container-apps.bicep' = {
       { name: 'AZURE_OPENAI_ENDPOINT', value: openAi.outputs.endpoint }
       { name: 'AZURE_OPENAI_GPT_DEPLOYMENT', value: openAiModelName }
       { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o-mini' }
-      { name: 'AZURE_OPENAI_O3_DEPLOYMENT', value: 'o3-mini' }
+      { name: 'AZURE_OPENAI_O3_DEPLOYMENT', value: 'gpt-4o' }
       { name: 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT', value: embeddingModelName }
       { name: 'AZURE_SEARCH_ENDPOINT', value: search.outputs.endpoint }
       { name: 'AZURE_SEARCH_INDEX', value: 'pubhealth-rfp-index' }
