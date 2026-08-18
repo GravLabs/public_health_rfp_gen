@@ -216,7 +216,7 @@ else
       info "Running smoke test: POST /classify ..."
       classify=$(curl -sf -X POST "https://$FQDN/classify" \
         -H "Content-Type: application/json" \
-        -d '{"description":"influenza surveillance program, CDC, 24 months"}' \
+        -d '{"text":"influenza surveillance program, CDC, 24 months"}' \
         --max-time 20 2>/dev/null || true)
       if echo "${classify:-}" | grep -q "program_area"; then
         area=$(echo "$classify" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("program_area","?"))' 2>/dev/null || echo "?")
