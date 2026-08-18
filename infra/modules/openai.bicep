@@ -39,6 +39,8 @@ resource gptDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10
   }
 }
 
+// Deployment named 'gpt-4o-mini' but backed by gpt-4.1-mini — gpt-4o-mini 2024-07-18
+// is in Deprecating state and blocked for new deployments in eastus as of 2026-08.
 resource miniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: openAi
   name: 'gpt-4o-mini'
@@ -50,8 +52,8 @@ resource miniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-1
   properties: {
     model: {
       format: 'OpenAI'
-      name: 'gpt-4o-mini'
-      version: '2024-07-18'
+      name: 'gpt-4.1-mini'
+      version: '2025-04-14'
     }
   }
 }
