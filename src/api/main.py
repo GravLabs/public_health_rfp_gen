@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import uuid
+from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -25,7 +26,11 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from bot import RfpBotHandler
 from models import (
     RfpRequest, RfpDraft, EvaluationResult, GenerateAndEvaluateResponse,
-    EvaluatorScores, GateDecision, HealthResponse, TokenUsage
+    EvaluatorScores, GateDecision, HealthResponse, TokenUsage,
+    ClassifyRequest, ClassifyResult,
+    ReviewRequest, ReviewResult, ReviewScore,
+    BudgetAuditRequest, BudgetAuditResult, BudgetLineItem,
+    RegulatoryWatchResult, RegulatoryAlert,
 )
 from sharepoint_client import SharePointClient
 from fabric_client import FabricClient
@@ -88,6 +93,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# In-memory draft cache keyed by draft_id — populated after gate PASS, used by /export
+_draft_cache: dict[str, dict] = {}
+
 
 async def _call_orchestrator(request: RfpRequest) -> dict:
     """Call the .NET Semantic Kernel orchestrator service."""
@@ -105,10 +113,9 @@ async def _call_orchestrator(request: RfpRequest) -> dict:
 async def _run_evaluation(draft: RfpDraft, request: RfpRequest) -> EvaluationResult:
     """Import and run the Python evaluation gate against the generated draft."""
     import sys
-    sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent / "evaluation"))
+    sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent / "evaluation"))
     from gate import evaluate_draft
 
-    full_text = "\n\n".join(draft.sections.values())
     params = {
         "total_funding": request.total_funding,
         "period_of_performance_months": request.period_of_performance_months,
@@ -118,24 +125,28 @@ async def _run_evaluation(draft: RfpDraft, request: RfpRequest) -> EvaluationRes
     }
 
     decision = evaluate_draft(
-        draft_text=full_text,
-        sections=draft.sections,
-        expected_params=params,
+        draft_id=draft.draft_id,
+        draft=draft.sections,
+        input_spec=params,
     )
 
+    scores_dict = {s.metric: s.score for s in decision.scores}
+    passed_threshold = {s.metric: s.passed for s in decision.scores}
+
+    from gate import GateResult as _GateResult
     return EvaluationResult(
         draft_id=draft.draft_id,
         rfp_id=draft.rfp_id,
-        gate_decision=GateDecision.PASS if decision.passed else GateDecision.FAIL,
+        gate_decision=GateDecision.PASS if decision.result == _GateResult.PASS else GateDecision.FAIL,
         scores=EvaluatorScores(
-            completeness=decision.scores.get("completeness", 0.0),
-            parameter_accuracy=decision.scores.get("parameter_accuracy", 0.0),
-            compliance=decision.scores.get("compliance", 0.0),
-            groundedness=decision.scores.get("groundedness", 0.0),
-            coherence=decision.scores.get("coherence", 0.0),
+            completeness=scores_dict.get("section_completeness", 0.0),
+            parameter_accuracy=scores_dict.get("parameter_accuracy", 0.0),
+            compliance=scores_dict.get("compliance_coverage", 0.0),
+            groundedness=scores_dict.get("groundedness", 0.0),
+            coherence=scores_dict.get("coherence", 0.0),
         ),
-        failure_reasons=decision.failure_reasons,
-        passed_threshold=decision.passed_threshold,
+        failure_reasons=decision.blocking_failures,
+        passed_threshold=passed_threshold,
     )
 
 
@@ -193,6 +204,9 @@ async def generate_and_evaluate(request: RfpRequest) -> GenerateAndEvaluateRespo
     evaluation = await _run_evaluation(draft, request)
     draft = await _persist_draft(draft, request, evaluation)
 
+    if evaluation.gate_decision == GateDecision.PASS:
+        _draft_cache[draft.draft_id] = {"rfp_id": draft.rfp_id, "sections": draft.sections}
+
     return GenerateAndEvaluateResponse(
         draft=draft,
         evaluation=evaluation,
@@ -246,6 +260,7 @@ async def generate_stream(request: RfpRequest):
                 rfp_id=rfp_id,
                 program_area=request.program_area,
                 federal_sponsor=request.federal_sponsor,
+                generated_at=datetime.utcnow().isoformat() + "Z",
                 sections=sections,
                 grounding_chunks=[],
                 token_usage=TokenUsage(prompt_tokens=0, completion_tokens=0),
@@ -253,9 +268,12 @@ async def generate_stream(request: RfpRequest):
             evaluation = await _run_evaluation(draft, request)
             draft = await _persist_draft(draft, request, evaluation)
 
+            if evaluation.gate_decision == GateDecision.PASS:
+                _draft_cache[draft.draft_id] = {"rfp_id": draft.rfp_id, "sections": sections}
+
             yield json.dumps({
                 "type": "gate_result",
-                "passed": evaluation.gate_decision.value == "pass",
+                "passed": evaluation.gate_decision == GateDecision.PASS,
                 "scores": evaluation.scores.model_dump(),
                 "failure_reasons": evaluation.failure_reasons,
                 "sharepoint_url": draft.sharepoint_url or "",
@@ -275,6 +293,26 @@ async def generate_stream(request: RfpRequest):
 async def evaluate(draft: RfpDraft, request: RfpRequest) -> EvaluationResult:
     """Run the evaluation gate on an already-generated draft."""
     return await _run_evaluation(draft, request)
+
+
+@app.post("/export/{draft_id}", summary="Upload approved draft to SharePoint and return link")
+async def export_draft(draft_id: str):
+    """Upload a gate-passed draft to SharePoint. Called after user approval."""
+    cached = _draft_cache.get(draft_id)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Draft not found or gate did not pass")
+    if not _sp_client:
+        raise HTTPException(status_code=503, detail="SharePoint not configured")
+
+    try:
+        sp_url = await _sp_client.upload_draft_docx(
+            SHAREPOINT_DRAFT_LIBRARY, cached["rfp_id"], draft_id, cached["sections"]
+        )
+    except Exception as exc:
+        log.exception("SharePoint upload failed for draft %s", draft_id)
+        raise HTTPException(status_code=500, detail=f"SharePoint upload failed: {exc}") from exc
+
+    return {"sharepoint_url": sp_url, "draft_id": draft_id, "rfp_id": cached["rfp_id"]}
 
 
 @app.get("/sharepoint/corpus", summary="List SharePoint corpus files")
@@ -342,6 +380,143 @@ async def foundry_info():
     info = await _foundry_project_client.get_project_info()
     deployments = await _foundry_project_client.list_deployments()
     return {**info, "deployments": [d.get("name") for d in deployments]}
+
+
+# ── Azure OpenAI helper (used by agent routes) ────────────────────────────────
+
+async def _azure_openai_chat(messages: list[dict], *, max_tokens: int = 2000, json_mode: bool = False) -> str:
+    from azure.identity.aio import DefaultAzureCredential as AsyncCred
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
+    deployment = os.getenv("AZURE_OPENAI_GPT_DEPLOYMENT", "gpt-4o")
+    async with AsyncCred() as cred:
+        token = await cred.get_token("https://cognitiveservices.azure.com/.default")
+    url = f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version=2024-06-01"
+    body: dict = {"messages": messages, "max_tokens": max_tokens, "temperature": 0.1}
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+    async with httpx.AsyncClient(timeout=120) as client:
+        resp = await client.post(url, headers={
+            "Authorization": f"Bearer {token.token}",
+            "Content-Type": "application/json",
+        }, json=body)
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+
+
+# ── Capability routes ─────────────────────────────────────────────────────────
+
+_TAXONOMY = (
+    "Influenza Surveillance | Whole Genome Sequencing | Antimicrobial Resistance | "
+    "Food Safety | Emergency Preparedness | HIV/STI Testing | Tuberculosis | "
+    "COVID-19 / Respiratory Pathogens | Bioterrorism / LRN | General Surveillance"
+)
+
+
+@app.post("/classify", response_model=ClassifyResult, summary="Classify program area from free text")
+async def classify_program_area(body: ClassifyRequest) -> ClassifyResult:
+    content = await _azure_openai_chat([
+        {"role": "system", "content": (
+            f"You are a public health program area classifier. Map the description to exactly one taxonomy entry: {_TAXONOMY}. "
+            "Return JSON with keys: program_area (str), confidence (float 0-1), rationale (str)."
+        )},
+        {"role": "user", "content": body.text},
+    ], max_tokens=300, json_mode=True)
+    return ClassifyResult(**json.loads(content))
+
+
+@app.post("/review", response_model=ReviewResult, summary="Score a proposal against evaluation criteria")
+async def review_proposal(body: ReviewRequest) -> ReviewResult:
+    criteria_list = "\n".join(f"- {c} (max 20 points)" for c in body.evaluation_criteria)
+    content = await _azure_openai_chat([
+        {"role": "system", "content": (
+            "You are a public health grants reviewer. Score each criterion 0-20 based on the proposal text. "
+            "Return JSON with keys: scores (object mapping criterion name to {score: int, evidence: str, flags: [str]}), "
+            "total_score (int), recommendation ('fund'|'revise'|'reject'), flags ([str])."
+        )},
+        {"role": "user", "content": (
+            f"Evaluation criteria:\n{criteria_list}\n\n"
+            f"Program area: {body.program_area or 'Public Health Laboratory'}\n\n"
+            f"Proposal text:\n{body.proposal_text[:8000]}"
+        )},
+    ], max_tokens=2000, json_mode=True)
+    data = json.loads(content)
+    scores = {k: ReviewScore(**v) for k, v in data.get("scores", {}).items()}
+    return ReviewResult(
+        scores=scores,
+        total_score=data.get("total_score", 0),
+        recommendation=data.get("recommendation", "revise"),
+        flags=data.get("flags", []),
+    )
+
+
+@app.post("/audit_budget", response_model=BudgetAuditResult, summary="Audit a budget narrative for allowability")
+async def audit_budget(body: BudgetAuditRequest) -> BudgetAuditResult:
+    content = await _azure_openai_chat([
+        {"role": "system", "content": (
+            "You are a federal grants budget compliance auditor (2 CFR Part 200). "
+            "Review each budget line for allowability and arithmetic accuracy. "
+            "Return JSON with keys: total_verified (bool), "
+            "line_items (list of {item: str, allowable: bool, issue: str or null}), "
+            "flags ([str]), recommendation ('approve'|'revise'|'reject')."
+        )},
+        {"role": "user", "content": (
+            f"Total award amount: ${body.total_funding:,.0f}\n"
+            f"Program area: {body.program_area or 'Public Health Laboratory'}\n\n"
+            f"Budget narrative:\n{body.budget_text[:8000]}"
+        )},
+    ], max_tokens=2000, json_mode=True)
+    data = json.loads(content)
+    line_items = [BudgetLineItem(**li) for li in data.get("line_items", [])]
+
+    # GPT is unreliable at arithmetic — strip arithmetic mismatch flags and compute ourselves.
+    # A budget is verified if the stated total appears verbatim in the budget text.
+    import re as _re
+    flags = [f for f in data.get("flags", [])
+             if not _re.search(r"arithmeti|does not match|sum|total.*exceed|exceed.*total", f, _re.I)]
+    total_str = f"{int(body.total_funding):,}"
+    total_verified = total_str in body.budget_text or str(int(body.total_funding)) in body.budget_text
+
+    has_issues = any(not li.allowable for li in line_items) or bool(flags)
+    recommendation = data.get("recommendation", "revise")
+    if total_verified and not has_issues:
+        recommendation = "approve"
+
+    return BudgetAuditResult(
+        total_verified=total_verified,
+        line_items=line_items,
+        flags=flags,
+        recommendation=recommendation,
+    )
+
+
+@app.post("/regulatory_watch", response_model=RegulatoryWatchResult, summary="Scan for regulatory changes affecting public health lab RFPs")
+async def regulatory_watch(days_back: int = 30) -> RegulatoryWatchResult:
+    content = await _azure_openai_chat([
+        {"role": "system", "content": (
+            "You are a federal regulatory specialist for public health laboratory programs. "
+            "Identify recent or upcoming regulatory changes that materially affect public health lab cooperative agreements — "
+            "including 2 CFR 200, 45 CFR, CLIA, CDC cooperative agreement requirements, and HHS grant policy. "
+            "Focus on changes from the past year that grant writers and RFP authors need to know about. "
+            "Return JSON with key 'alerts' containing a list of objects, each with keys: "
+            "regulation (str), effective_date (str), change_summary (str), affected_programs (list of str), action_required (str)."
+        )},
+        {"role": "user", "content": (
+            f"List up to 5 regulatory changes relevant to public health laboratory RFPs from the past {days_back} days "
+            "or upcoming changes grant writers should prepare for. If none are recent, include the most impactful "
+            "standing requirements RFP authors often overlook."
+        )},
+    ], max_tokens=1500, json_mode=True)
+
+    try:
+        data = json.loads(content)
+        alerts = [RegulatoryAlert(**a) for a in data.get("alerts", [])]
+    except Exception:
+        alerts = []
+    return RegulatoryWatchResult(
+        alerts=alerts,
+        checked_at=datetime.utcnow().isoformat() + "Z",
+        days_back=days_back,
+    )
 
 
 @app.post("/api/messages", summary="Teams Bot webhook")

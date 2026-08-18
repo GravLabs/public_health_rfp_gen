@@ -87,8 +87,6 @@ public class RfpOrchestrationService(
         using var genActivity = FoundryTracingExtensions.StartGenerationActivity(rfpId, request.ProgramArea);
 
         var searchPlugin = new SearchPlugin(searchClient);
-        kernel.Plugins.AddFromObject(searchPlugin, "Search");
-
         var contextJson = await searchPlugin.SearchAllSectionsAsync(request.ProgramArea, cancellationToken);
         var groundingContext = BuildGroundingContext(request, contextJson, groundingChunks);
 
@@ -264,8 +262,6 @@ public class RfpOrchestrationService(
         yield return new SectionStreamEvent("started", Total: total);
 
         var searchPlugin = new SearchPlugin(searchClient);
-        kernel.Plugins.AddFromObject(searchPlugin, "Search");
-
         var contextJson = await searchPlugin.SearchAllSectionsAsync(request.ProgramArea, cancellationToken);
         var groundingContext = BuildGroundingContext(request, contextJson, groundingChunks);
 

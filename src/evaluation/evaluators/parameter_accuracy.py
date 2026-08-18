@@ -11,11 +11,11 @@ from typing import Any
 def _find_amount(text: str, label: str) -> str | None:
     # Find lines containing the label, then extract the first dollar amount on that line.
     # This handles "Total funding available: $3,500,000" where label="Total".
-    amount_pat = re.compile(r'\$?([\d,]+(?:\.\d+)?(?:M|K)?)')
+    amount_pat = re.compile(r'\$([\d,]+(?:\.\d+)?(?:M|K)?)')
     for line in text.splitlines():
         if re.search(re.escape(label), line, re.IGNORECASE):
             m = amount_pat.search(line)
-            if m and m.group(1).replace(",", "").replace(".", "").isdigit():
+            if m:
                 return m.group(1).replace(",", "")
     return None
 

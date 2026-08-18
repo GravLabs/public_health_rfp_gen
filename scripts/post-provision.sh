@@ -75,14 +75,14 @@ else
 fi
 
 echo "[4/6] Setting up AI Foundry connections"
-if [ -n "$FOUNDRY_PROJECT" ]; then
-  echo "      AI Foundry project: $FOUNDRY_PROJECT"
-  # Export for downstream services
-  azd env set AZURE_AI_FOUNDRY_PROJECT_ENDPOINT "$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_ENDPOINT 2>/dev/null || echo '')"
-  echo "      ✓ AI Foundry environment vars set"
-else
-  echo "      ⚠ AZURE_AI_FOUNDRY_PROJECT_NAME not found — skipping Foundry setup"
-fi
+# Known project endpoint (eastus hub: mlw-pubhealth-hub-2gdlihbjsb5rk)
+FOUNDRY_ENDPOINT=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_ENDPOINT 2>/dev/null || echo "https://eastus.api.azureml.ms")
+FOUNDRY_PROJECT_NAME=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_NAME 2>/dev/null || echo "mlw-pubhealth-rfp-2gdlihbjsb5rk")
+FOUNDRY_HUB=$(azd env get-value AZURE_AI_FOUNDRY_HUB_NAME 2>/dev/null || echo "mlw-pubhealth-hub-2gdlihbjsb5rk")
+azd env set AZURE_AI_FOUNDRY_PROJECT_ENDPOINT "$FOUNDRY_ENDPOINT"
+azd env set AZURE_AI_FOUNDRY_PROJECT_NAME "$FOUNDRY_PROJECT_NAME"
+azd env set AZURE_AI_FOUNDRY_HUB_NAME "$FOUNDRY_HUB"
+echo "      ✓ AI Foundry vars set: $FOUNDRY_PROJECT_NAME @ $FOUNDRY_ENDPOINT"
 
 echo "[5/6] Fabric setup"
 FABRIC_WORKSPACE=$(azd env get-value FABRIC_WORKSPACE_ID 2>/dev/null || echo "")
@@ -112,6 +112,33 @@ BUDGET_WARN_THRESHOLD=0.80
 BUDGET_CRITICAL_THRESHOLD=0.95
 EOF
 echo "      .env written (do not commit — already in .gitignore)"
+
+echo "[7/7] Restoring bot App ID on API container (protects against Bicep reset)"
+# azd provision may recreate the container app, resetting MICROSOFT_APP_ID to the old value.
+# Always enforce the correct App Registration (pubhealth-rfp-bot-v2: 26b9c245).
+BOT_APP_ID="26b9c245-880d-458b-9edf-809c1a7f534a"
+RESOURCE_GROUP_NAME=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || echo "")
+if [ -n "$RESOURCE_GROUP_NAME" ]; then
+  API_APP_NAME=$(az containerapp list \
+    --resource-group "$RESOURCE_GROUP_NAME" \
+    --query "[?tags.\"azd-service-name\"=='api'].name | [0]" \
+    -o tsv 2>/dev/null || echo "")
+  if [ -n "$API_APP_NAME" ]; then
+    CURRENT_IMAGE=$(az containerapp show -n "$API_APP_NAME" -g "$RESOURCE_GROUP_NAME" \
+      --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
+    if [ -n "$CURRENT_IMAGE" ]; then
+      az containerapp update \
+        --name "$API_APP_NAME" \
+        --resource-group "$RESOURCE_GROUP_NAME" \
+        --image "$CURRENT_IMAGE" \
+        --set-env-vars "MICROSOFT_APP_ID=$BOT_APP_ID" \
+        --revision-suffix "botfix-$(date +%s)" \
+        --output none 2>/dev/null && echo "  ✓ MICROSOFT_APP_ID=$BOT_APP_ID set on $API_APP_NAME"
+    fi
+  fi
+else
+  echo "  ⚠ AZURE_RESOURCE_GROUP not set — skipping bot App ID restore"
+fi
 
 echo ""
 echo "=== Post-provision complete ==="

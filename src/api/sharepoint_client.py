@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -128,20 +129,19 @@ class SharePointClient:
         sections: dict[str, str],
         folder: str = "GeneratedDrafts",
     ) -> str:
-        """Assemble a Word document from RFP sections and upload to SharePoint."""
+        """Assemble a Word document from RFP sections and upload to SharePoint.
+
+        Uses the site default drive to avoid drive-listing permission issues.
+        The folder is created automatically by Graph if it does not exist.
+        """
         docx_bytes = SharePointClient.draft_to_docx(rfp_id, sections)
-        file_name = f"{rfp_id}_{draft_id}.docx"
+        safe_rfp_id = rfp_id.replace("/", "-").replace("\\", "-")
+        file_name = f"{safe_rfp_id}_{draft_id}.docx"
 
-        url = f"{GRAPH_BASE}/sites/{self._site_id}/drives"
-        async with httpx.AsyncClient(timeout=30) as client:
-            drives_resp = await client.get(url, headers=self._headers())
-            drives_resp.raise_for_status()
-            drives = drives_resp.json()["value"]
-
-        drive = next((d for d in drives if d["name"] == library_name), drives[0])
-        drive_id = drive["id"]
-
-        upload_url = f"{GRAPH_BASE}/drives/{drive_id}/root:/{folder}/{file_name}:/content"
+        upload_url = (
+            f"{GRAPH_BASE}/sites/{self._site_id}/drive"
+            f"/root:/{folder}/{file_name}:/content"
+        )
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         headers = {**self._headers(), "Content-Type": content_type}
 
@@ -163,6 +163,96 @@ class SharePointClient:
         return resp.json()["id"]
 
     # ── Utility ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _add_inline_md(paragraph, text: str) -> None:
+        """Add inline markdown (bold/italic) as properly formatted Word runs."""
+        import re
+        parts = re.split(r'(\*\*[^*]+\*\*|\*[^*]+\*)', text)
+        for part in parts:
+            if part.startswith("**") and part.endswith("**"):
+                paragraph.add_run(part[2:-2]).bold = True
+            elif part.startswith("*") and part.endswith("*"):
+                paragraph.add_run(part[1:-1]).italic = True
+            else:
+                paragraph.add_run(part)
+
+    @staticmethod
+    def _add_md_block(doc, line: str) -> None:
+        """Convert a single markdown line to the appropriate Word paragraph type."""
+        import re
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+        line = line.rstrip()
+        if not line:
+            return
+
+        heading_m = re.match(r'^(#{1,4})\s+(.+)$', line)
+        if heading_m:
+            level = min(len(heading_m.group(1)) + 1, 4)
+            doc.add_heading(heading_m.group(2), level=level)
+            return
+
+        bullet_m = re.match(r'^[-*]\s+(.+)$', line)
+        if bullet_m:
+            p = doc.add_paragraph(style='List Bullet')
+            SharePointClient._add_inline_md(p, bullet_m.group(1))
+            return
+
+        num_m = re.match(r'^\d+\.\s+(.+)$', line)
+        if num_m:
+            p = doc.add_paragraph(style='List Number')
+            SharePointClient._add_inline_md(p, num_m.group(1))
+            return
+
+        # Horizontal rule — skip
+        if re.match(r'^-{3,}$', line):
+            return
+
+        p = doc.add_paragraph()
+        SharePointClient._add_inline_md(p, line)
+
+    @staticmethod
+    def _render_md_table(doc, table_lines: list[str]) -> None:
+        """Convert markdown table lines into a Word table."""
+        from docx.shared import RGBColor
+        rows = [
+            [cell.strip() for cell in line.strip().strip("|").split("|")]
+            for line in table_lines
+            if not re.match(r'^\|?[\s:|-]+\|?$', line.strip())  # skip separator row
+        ]
+        if not rows:
+            return
+        col_count = max(len(r) for r in rows)
+        tbl = doc.add_table(rows=len(rows), cols=col_count)
+        tbl.style = "Table Grid"
+        for r_idx, row_data in enumerate(rows):
+            for c_idx in range(col_count):
+                cell = tbl.rows[r_idx].cells[c_idx]
+                text = row_data[c_idx] if c_idx < len(row_data) else ""
+                p = cell.paragraphs[0]
+                SharePointClient._add_inline_md(p, text)
+                if r_idx == 0:
+                    for run in p.runs:
+                        run.bold = True
+
+    @staticmethod
+    def _render_section(doc, content: str) -> None:
+        """Render markdown content into Word paragraphs, handling tables as blocks."""
+        lines = content.splitlines()
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            # Detect start of a markdown table
+            if re.match(r'^\s*\|', line):
+                table_block = []
+                while i < len(lines) and re.match(r'^\s*\|', lines[i]):
+                    table_block.append(lines[i])
+                    i += 1
+                SharePointClient._render_md_table(doc, table_block)
+            else:
+                SharePointClient._add_md_block(doc, line)
+                i += 1
 
     @staticmethod
     def draft_to_docx(rfp_id: str, sections: dict[str, str]) -> bytes:
@@ -201,7 +291,7 @@ class SharePointClient:
         for key, heading in SECTION_HEADINGS.items():
             doc.add_heading(heading, level=1)
             content = sections.get(key, "Not generated.")
-            doc.add_paragraph(content)
+            SharePointClient._render_section(doc, content)
 
         buf = io.BytesIO()
         doc.save(buf)

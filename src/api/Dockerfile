@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY api/ .
 COPY bot/bot.py .
+COPY evaluation/ ./evaluation/
 
 ENV PYTHONUNBUFFERED=1
 

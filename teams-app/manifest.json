@@ -1,8 +1,8 @@
 {
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
   "manifestVersion": "1.16",
-  "version": "1.0.0",
-  "id": "${{MICROSOFT_APP_ID}}",
+  "version": "1.0.1",
+  "id": "26b9c245-880d-458b-9edf-809c1a7f534a",
   "developer": {
     "name": "Graviton Labs",
     "websiteUrl": "https://www.graviton-labs.com",
@@ -24,9 +24,9 @@
   "accentColor": "#0369A1",
   "bots": [
     {
-      "botId": "${{MICROSOFT_APP_ID}}",
+      "botId": "26b9c245-880d-458b-9edf-809c1a7f534a",
       "scopes": ["personal", "team", "groupchat"],
-      "supportsFiles": false,
+      "supportsFiles": true,
       "isNotificationOnly": false,
       "commandLists": [
         {

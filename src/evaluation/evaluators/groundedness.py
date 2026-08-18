@@ -1,42 +1,67 @@
 """
-Groundedness evaluator via Azure AI Foundry Evaluation SDK.
-Measures whether generated text is supported by the retrieved source documents.
+Groundedness evaluator — direct Azure OpenAI call, no SDK dependency.
+Evaluates whether the RFP content is factually consistent with federal grant norms
+and the stated input parameters (program area, sponsor, funding, period).
+Auth: uses AZURE_OPENAI_API_KEY if set, otherwise DefaultAzureCredential (managed identity).
 """
 
 import os
-from azure.ai.evaluation import GroundednessEvaluator
+import json
+import httpx
 
-# Routes through APIM using gpt-4o-mini — structured scoring task, no need for full GPT-4o.
-# APIM subscription key (sub-evaluation) is the auth mechanism; APIM authenticates to
-# Azure OpenAI via SystemAssigned managed identity so no OpenAI key is exposed here.
-APIM_ENDPOINT = os.getenv("AZURE_APIM_GATEWAY_URL")
-APIM_EVAL_KEY = os.getenv("AZURE_APIM_EVALUATION_KEY")
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 MINI_DEPLOYMENT = os.getenv("AZURE_OPENAI_MINI_DEPLOYMENT", "gpt-4o-mini")
+API_VERSION = "2024-06-01"
+
+_SYSTEM = (
+    "You are a federal grant specialist evaluating an AI-generated RFP. "
+    "Score the RFP on how factually grounded it is — meaning: accurate use of federal grant terminology, "
+    "regulatory citations (2 CFR 200, CLIA, etc.), and consistency with the stated program parameters. "
+    "Scale: 1 = fabricated or inaccurate content, 5 = fully grounded in federal grant norms. "
+    "Reply with JSON only: {\"score\": <int 1-5>, \"reason\": \"<one sentence>\"}."
+)
+
+
+def _auth_header() -> dict:
+    api_key = os.getenv("AZURE_OPENAI_API_KEY")
+    if api_key:
+        return {"api-key": api_key}
+    from azure.identity import DefaultAzureCredential
+    token = DefaultAzureCredential().get_token("https://cognitiveservices.azure.com/.default").token
+    return {"Authorization": f"Bearer {token}"}
 
 
 def score_groundedness(generated_text: str, input_spec: dict) -> float:
-    """
-    Returns a 0.0–1.0 groundedness score.
-    context is constructed from the input spec (which the retriever used as the query basis).
-    For production, pass retrieved document chunks as context instead.
-    """
-    model_config = {
-        "azure_endpoint": APIM_ENDPOINT,
-        "azure_deployment": MINI_DEPLOYMENT,
-        "api_version": "2024-06-01",
-        "api_key": APIM_EVAL_KEY,
+    params_summary = ", ".join(
+        f"{k}={v}" for k, v in input_spec.items()
+        if k not in ("_grounding_context",) and v is not None
+    )
+    snippet = generated_text[:3000]
+
+    url = (
+        f"{AZURE_OPENAI_ENDPOINT.rstrip('/')}/openai/deployments/"
+        f"{MINI_DEPLOYMENT}/chat/completions?api-version={API_VERSION}"
+    )
+    payload = {
+        "messages": [
+            {"role": "system", "content": _SYSTEM},
+            {
+                "role": "user",
+                "content": (
+                    f"PROGRAM PARAMETERS: {params_summary}\n\n"
+                    f"RFP CONTENT:\n{snippet}"
+                ),
+            },
+        ],
+        "temperature": 0,
+        "max_tokens": 100,
+        "response_format": {"type": "json_object"},
     }
 
-    evaluator = GroundednessEvaluator(model_config=model_config)
+    with httpx.Client(timeout=30) as client:
+        resp = client.post(url, json=payload, headers=_auth_header())
+        resp.raise_for_status()
 
-    # Build a context string from the input spec for grounding reference
-    context = "\n".join(f"{k}: {v}" for k, v in input_spec.items() if isinstance(v, str))
-
-    result = evaluator(
-        response=generated_text,
-        context=context,
-    )
-
-    # AI Foundry returns score as 1–5 Likert; normalize to 0–1
-    raw = result.get("groundedness", 3.0)
+    content = resp.json()["choices"][0]["message"]["content"]
+    raw = json.loads(content).get("score", 3)
     return (float(raw) - 1.0) / 4.0

@@ -83,3 +83,77 @@ class HealthResponse(BaseModel):
     search_reachable: bool
     sharepoint_configured: bool
     fabric_configured: bool
+
+
+# ── Classification ───────────────────────────────────────────────────────────────
+
+class ClassifyRequest(BaseModel):
+    text: str
+
+
+class ClassifyResult(BaseModel):
+    program_area: str
+    confidence: float
+    rationale: str
+
+
+# ── Proposal Review ──────────────────────────────────────────────────────────────
+
+class ReviewRequest(BaseModel):
+    proposal_text: str
+    rfp_id: Optional[str] = None
+    program_area: Optional[str] = None
+    evaluation_criteria: list[str] = [
+        "Technical Approach", "Organizational Capacity",
+        "Personnel Qualifications", "Budget Justification", "Evaluation Plan",
+    ]
+
+
+class ReviewScore(BaseModel):
+    score: int
+    evidence: str
+    flags: list[str] = []
+
+
+class ReviewResult(BaseModel):
+    scores: dict[str, ReviewScore]
+    total_score: int
+    recommendation: str
+    flags: list[str] = []
+
+
+# ── Budget Audit ─────────────────────────────────────────────────────────────────
+
+class BudgetAuditRequest(BaseModel):
+    budget_text: str
+    total_funding: float
+    program_area: Optional[str] = None
+
+
+class BudgetLineItem(BaseModel):
+    item: str
+    allowable: bool
+    issue: Optional[str] = None
+
+
+class BudgetAuditResult(BaseModel):
+    total_verified: bool
+    line_items: list[BudgetLineItem] = []
+    flags: list[str] = []
+    recommendation: str
+
+
+# ── Regulatory Watch ─────────────────────────────────────────────────────────────
+
+class RegulatoryAlert(BaseModel):
+    regulation: str
+    effective_date: str
+    change_summary: str
+    affected_programs: list[str] = []
+    action_required: str
+
+
+class RegulatoryWatchResult(BaseModel):
+    alerts: list[RegulatoryAlert] = []
+    checked_at: str
+    days_back: int

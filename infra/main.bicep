@@ -13,7 +13,7 @@ param openAiModelVersion string = '2024-08-06'
 param embeddingModelName string = 'text-embedding-3-small'
 param searchSkuName string = 'basic'
 param budgetAmountUsd int = 500
-param botAppId string = '23bfa01a-297d-4385-ba74-7482ff9799d8'
+param botAppId string = '26b9c245-880d-458b-9edf-809c1a7f534a'
 @secure()
 param botAppSecret string = ''
 param tags object = {}
@@ -151,7 +151,7 @@ module containerApps 'modules/container-apps.bicep' = {
       { name: 'AZURE_CLIENT_ID', value: identity.outputs.clientId }
       { name: 'AZURE_OPENAI_ENDPOINT', value: openAi.outputs.endpoint }
       { name: 'AZURE_OPENAI_GPT_DEPLOYMENT', value: openAiModelName }
-      { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o-mini' }
+      { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o' }
       { name: 'AZURE_SEARCH_ENDPOINT', value: search.outputs.endpoint }
       { name: 'AZURE_SEARCH_INDEX', value: 'pubhealth-rfp-index' }
       { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: monitoring.outputs.appInsightsConnectionString }

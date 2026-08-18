@@ -423,18 +423,18 @@
   <div class="cap-grid">
     <div class="cap-card">
       <div class="cap-icon">📄</div>
-      <h3>RFP Drafting</h3>
-      <p>Generates all eight required RFP sections — background, funding parameters, eligibility, scope of work, reporting, budget, evaluation criteria, and submission instructions — grounded in historical award precedents.</p>
+      <h3>RFP Drafting + Quality Gate</h3>
+      <p>Generates all eight required RFP sections grounded in historical award precedents, then automatically runs five independent evaluators (completeness, parameter accuracy, compliance, groundedness, coherence). A draft only reaches the program officer if it passes all five checks.</p>
     </div>
     <div class="cap-card">
       <div class="cap-icon">✅</div>
-      <h3>Quality Gate</h3>
-      <p>Five independent evaluators check completeness, parameter accuracy, compliance citations, groundedness, and coherence before any draft surfaces to a human reviewer. Failures are explained, not just flagged.</p>
+      <h3>Human Approval + SharePoint Upload</h3>
+      <p>After reviewing the draft in Teams, the program officer clicks <strong>Approve &amp; Save to SharePoint</strong>. The platform assembles a fully-formatted Word document and uploads it to the SharePoint Generated Drafts library, returning a direct link — no file download required.</p>
     </div>
     <div class="cap-card">
       <div class="cap-icon">📋</div>
       <h3>Proposal Review</h3>
-      <p>After an RFP closes, reviewers submit incoming proposals for scoring against the RFP's own evaluation criteria. Returns a structured score per criterion with evidence excerpts and a fund / do-not-fund recommendation.</p>
+      <p>After an RFP closes, reviewers submit incoming proposals for scoring against the RFP's own evaluation criteria. Returns a structured score per criterion with evidence excerpts and a fund / do-not-fund recommendation. Supports PDF and Word file attachments.</p>
     </div>
     <div class="cap-card">
       <div class="cap-icon">🔍</div>
@@ -444,12 +444,12 @@
     <div class="cap-card">
       <div class="cap-icon">⚖️</div>
       <h3>Regulatory Watch</h3>
-      <p>Monitors the Federal Register and CDC guidance channels nightly. When new regulations affect grant compliance requirements, the system identifies which existing RFPs in the corpus need to be updated.</p>
+      <p>Scans the Federal Register and CDC guidance channels for recent regulatory changes affecting public health laboratory programs — 2 CFR 200, CLIA, select-agent rules, and more. Returns a structured alert list with required actions.</p>
     </div>
     <div class="cap-card">
       <div class="cap-icon">💰</div>
       <h3>Budget Audit</h3>
-      <p>Reviews submitted budget narratives against the originating RFP's funding parameters — flagging discrepancies in total award, performance period, or cost-sharing requirements before the review panel convenes.</p>
+      <p>Reviews submitted budget narratives against the originating RFP's funding parameters — flagging discrepancies in total award, performance period, or cost-sharing requirements before the review panel convenes. Arithmetic is verified server-side.</p>
     </div>
   </div>
 
@@ -536,7 +536,7 @@
             <span style="display:flex;justify-content:space-between"><span>Groundedness</span><span style="color:var(--green,#059669)">0.94</span></span>
             <span style="display:flex;justify-content:space-between"><span>Coherence</span><span style="color:var(--green,#059669)">0.87</span></span>
           </div>
-          <a href="#" style="display:inline-block;background:var(--accent,#3B82F6);color:white;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:.78rem;font-weight:600">Open Word Draft in SharePoint</a>
+          <a href="#" style="display:inline-block;background:var(--green,#059669);color:white;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:.78rem;font-weight:600">✅ Approve &amp; Save to SharePoint</a>
         </div>
       </div>
       <div class="msg user">
@@ -549,6 +549,49 @@
           Reviewed <strong>proposal.pdf</strong> against RFP-2024-FLU-027 evaluation criteria.<br><br>
           Technical Approach: 8.5/10 · Organizational Capacity: 7.0/10 · Budget Justification: 6.5/10<br><br>
           <strong>Recommendation: Fund with conditions.</strong> Budget narrative does not itemize indirect cost rate. See section 3.2 for details.
+        </div>
+      </div>
+
+      <div class="msg user">
+        <div class="msg-bubble">Classify: antimicrobial resistance surveillance program, multi-state coordination, clinical isolates</div>
+        <div class="msg-avatar">👩‍💼</div>
+      </div>
+      <div class="msg bot">
+        <div class="msg-avatar">🤖</div>
+        <div class="msg-bubble">
+          Program Area: <strong>Antimicrobial Resistance (AMR)</strong> · Confidence: 0.96<br><br>
+          Matched taxonomy: <code>antimicrobial-resistance → surveillance</code><br><br>
+          Suggested RFP keywords: AMR, WHONET, clinical isolates, antibiogram, multi-state sentinel network
+        </div>
+      </div>
+
+      <div class="msg user">
+        <div class="msg-bubble">Audit this budget against RFP-2024-AMR-011 ($250K ceiling, 12-month period): Personnel $180K · Fringe $45K · Travel $22K · Supplies $18K · Indirect (28%) $74K — Total $339K</div>
+        <div class="msg-avatar">👩‍💼</div>
+      </div>
+      <div class="msg bot">
+        <div class="msg-avatar">🤖</div>
+        <div class="msg-bubble">
+          <strong style="color:var(--amber,#B45309)">⚠ Budget Audit — 2 issues found</strong><br><br>
+          <strong>1. Ceiling exceeded:</strong> Claimed total $339K exceeds RFP ceiling $250K by $89K.<br>
+          <strong>2. Indirect rate:</strong> 28% claimed; RFP section 4.2 caps indirect at 26%.<br><br>
+          Direct costs: $265K · Indirect (claimed): $74K · Allowable indirect (26%): $68.9K<br><br>
+          Revise budget before submission or request a ceiling waiver from the program officer.
+        </div>
+      </div>
+
+      <div class="msg user">
+        <div class="msg-bubble">Any recent CFR changes affecting public health labs?</div>
+        <div class="msg-avatar">👩‍💼</div>
+      </div>
+      <div class="msg bot">
+        <div class="msg-avatar">🤖</div>
+        <div class="msg-bubble">
+          <strong>Regulatory Watch — 3 changes flagged</strong><br><br>
+          📋 <strong>2 CFR 200.332</strong> — Updated subrecipient monitoring thresholds; single-audit threshold raised to $1.0M (effective 2026-10-01)<br><br>
+          📋 <strong>42 CFR 493 (CLIA)</strong> — Waiver category expanded for rapid molecular point-of-care testing panels<br><br>
+          📋 <strong>45 CFR 75.414</strong> — Indirect cost rate negotiation deadline extended 30 days for first-time recipients<br><br>
+          <em style="font-size:.85em;opacity:.7">Review against your active RFPs and update compliance language as needed.</em>
         </div>
       </div>
     </div>
@@ -572,8 +615,8 @@
     <div class="step">
       <div class="step-num">3</div>
       <div class="step-body">
-        <h3>Open the Word document directly in SharePoint</h3>
-        <p>Gate-passing drafts are saved as Word (.docx) files in the SharePoint Generated Drafts library. The Teams card shows an "Open Word Draft in SharePoint" button. Program officers and compliance reviewers open the document in the browser, make tracked changes, and approve through the standard SharePoint workflow — no file download required.</p>
+        <h3>Approve and save to SharePoint</h3>
+        <p>The Teams card shows the full draft text and evaluation scores. When the program officer is satisfied, they click <strong>Approve &amp; Save to SharePoint</strong>. The platform assembles a properly-formatted Word document — section headings, bullet lists, and tables rendered as native Word styles — and uploads it to the Generated Drafts library. A direct SharePoint link appears in the chat. Reviewers open the document in the browser, make tracked changes, and move it through the standard approval workflow.</p>
       </div>
     </div>
     <div class="step">
@@ -600,7 +643,7 @@
       </thead>
       <tbody>
         <tr><td>AI model costs — generation (GPT-4o fine-tuned)</td><td class="num">$80–140</td><td class="num">$220–370</td></tr>
-        <tr><td>AI model costs — evaluation gate (GPT-4o-mini + o3-mini)</td><td class="num">$8–18</td><td class="num">$22–50</td></tr>
+        <tr><td>AI model costs — evaluation gate (GPT-4o-mini)</td><td class="num">$8–18</td><td class="num">$22–50</td></tr>
         <tr><td>Search and retrieval (Azure AI Search)</td><td class="num">$75</td><td class="num">$250</td></tr>
         <tr><td>API Gateway (Azure API Management)</td><td class="num">$0–5</td><td class="num">$49</td></tr>
         <tr><td>Application hosting (Container Apps)</td><td class="num">$20–40</td><td class="num">$40–120</td></tr>

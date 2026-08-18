@@ -453,15 +453,19 @@ graph TD
   STREAM["③ Background NDJSON stream\nPOST /generate/stream"]
   LOOP["④ Each section completes\nBot calls UpdateActivity\n1/8 ✓ … 8/8 ✓"]
   EVAL["⑤ Evaluation gate\nGroundedness · Coherence · Compliance\nCompleteness · Parameter Accuracy"]
-  UPLOAD["⑥ upload_draft_docx()\n→ SharePoint Generated Drafts"]
-  FINAL["⑦ Final result card\nScores + Open Word in SharePoint button"]
+  CACHE["⑥ Gate PASS → draft cached in memory\n_draft_cache[draft_id]"]
+  FINAL["⑦ Final result card\nScores + '✅ Approve & Save to SharePoint' button"]
+  APPROVE["⑧ User clicks Approve\nActivity.value → POST /export/{draft_id}"]
+  UPLOAD["⑨ upload_draft_docx()\n→ SharePoint Generated Drafts\nReturns webUrl"]
 
   MSG --> CARD0
   CARD0 --> STREAM
   STREAM --> LOOP
   LOOP --> EVAL
-  EVAL --> UPLOAD
-  UPLOAD --> FINAL
+  EVAL --> CACHE
+  CACHE --> FINAL
+  FINAL --> APPROVE
+  APPROVE --> UPLOAD
       </pre>
     </div>
 
@@ -604,6 +608,24 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
             <td><code>program_area</code> + confidence</td>
           </tr>
           <tr>
+            <td>POST</td>
+            <td class="mono-cell">/audit_budget</td>
+            <td><code>budget_text, total_funding</code></td>
+            <td>Line-item allowability + arithmetic verification</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td class="mono-cell">/regulatory_watch</td>
+            <td><code>days_back</code> (query param)</td>
+            <td>Structured alert list of recent regulatory changes</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td class="mono-cell">/export/{draft_id}</td>
+            <td>—</td>
+            <td>Assembles Word doc from cached draft, uploads to SharePoint, returns <code>sharepoint_url</code></td>
+          </tr>
+          <tr>
             <td>GET</td>
             <td class="mono-cell">/health</td>
             <td>—</td>
@@ -661,7 +683,7 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
         </thead>
         <tbody>
           <tr><td class="mono-cell">sub-generation</td><td>RFP Generation (Foundry Agent + Prompt Flow)</td><td class="right">500,000</td></tr>
-          <tr><td class="mono-cell">sub-evaluation</td><td>Evaluation Gate (5-dimension, AI Evaluations SDK)</td><td class="right">500,000</td></tr>
+          <tr><td class="mono-cell">sub-evaluation</td><td>Evaluation Gate (5-dimension, direct httpx to gpt-4o-mini)</td><td class="right">500,000</td></tr>
           <tr><td class="mono-cell">sub-agents</td><td>Specialist Agents (Proposal Review, Regulatory, Audit)</td><td class="right">500,000</td></tr>
         </tbody>
       </table>
@@ -766,13 +788,13 @@ flowchart TD
           </tr>
           <tr>
             <td>Parameter accuracy audit</td>
-            <td><code>o3-mini</code></td>
-            <td>Arithmetic comparison (requested amount vs. budget ceiling, duration vs. period limits); reasoning model catches edge cases instruction-following models miss</td>
+            <td><code>gpt-4o</code></td>
+            <td>Arithmetic comparison (requested amount vs. budget ceiling, duration vs. period limits); structured JSON extraction via function calling</td>
           </tr>
           <tr>
             <td>Budget audit</td>
-            <td><code>o3-mini</code></td>
-            <td>Multi-step budget narrative validation; benefits from chain-of-thought reasoning built into the model</td>
+            <td><code>gpt-4o</code></td>
+            <td>Multi-step budget narrative validation with server-side arithmetic verification; GPT-4o used (o3-mini not available in eastus)</td>
           </tr>
           <tr>
             <td>Intent classification</td>
@@ -792,7 +814,7 @@ flowchart TD
     <p>The <code>deploymentId</code> URL parameter is a matched route parameter in the APIM operation template <code>/deployments/{deploymentId}/chat/completions</code>. The policy reads it directly — no custom headers or application code changes needed.</p>
     <pre><code><span class="comment">&lt;!-- apim.bicep — inbound policy (excerpt) --&gt;</span>
 &lt;choose&gt;
-  &lt;when condition=<span class="str">"@(new[]{&quot;gpt-4o-mini&quot;,&quot;o3-mini&quot;}.Contains(
+  &lt;when condition=<span class="str">"@(new[]{&quot;gpt-4o-mini&quot;}.Contains(
       context.Request.MatchedParameters.GetValueOrDefault(&quot;deploymentId&quot;,&quot;&quot;)))"</span>&gt;
     &lt;<span class="kw">set-backend-service</span> backend-id=<span class="str">"openai-base"</span> /&gt;
   &lt;/when&gt;
@@ -801,7 +823,7 @@ flowchart TD
   &lt;/otherwise&gt;
 &lt;/choose&gt;</code></pre>
 
-    <p>The <code>openai-pool</code> backend routes fine-tuned GPT-4o (priority 1) → base GPT-4o (priority 2) for generation. The <code>openai-base</code> backend routes mini and o3-mini directly — they are not fine-tuned and do not participate in the pool.</p>
+    <p>The <code>openai-pool</code> backend routes fine-tuned GPT-4o (priority 1) → base GPT-4o (priority 2) for generation. The <code>openai-base</code> backend routes gpt-4o-mini directly — it is not fine-tuned and does not participate in the pool. Note: <code>o3-mini</code> is not available in the eastus region; all reasoning-heavy tasks use GPT-4o.</p>
 
     <h3>Evaluator configuration</h3>
     <p>The AI Evaluations SDK does not accept <code>DefaultAzureCredential</code> when the endpoint is APIM rather than a direct Azure OpenAI URL. Evaluators use an APIM subscription key (<code>AZURE_APIM_EVALUATION_KEY</code>); APIM authenticates onward to Azure OpenAI via its SystemAssigned managed identity — no OpenAI key is ever held by application code.</p>
@@ -932,7 +954,7 @@ flowchart TD
   <!-- ── Evaluation Gate ─────────────────────────────────────────────────────── -->
   <section id="evaluation">
     <h2>Evaluation Gate — 5 Dimensions</h2>
-    <p>All five evaluators run independently using the Azure AI Evaluations SDK (<code>azure-ai-evaluation</code>). A draft must pass all five to proceed to SharePoint. Individual failures return dimension-level failure reasons.</p>
+    <p>All five evaluators run independently via direct <code>httpx</code> calls to the Azure OpenAI chat completions endpoint. A draft must pass all five to proceed. Individual failures return dimension-level failure reasons. The <code>azure-ai-evaluation</code> SDK was removed — it pulled in <code>aiohttp</code>, which crashed the FastAPI async event loop in Container Apps.</p>
 
     <div class="table-wrap">
       <table>
@@ -974,23 +996,27 @@ flowchart TD
       </table>
     </div>
 
-    <h3>Evaluation SDK pattern</h3>
-    <pre><code><span class="kw">from</span> azure.ai.evaluation <span class="kw">import</span> GroundednessEvaluator, evaluate
+    <h3>Evaluator pattern (direct httpx)</h3>
+    <pre><code><span class="comment"># src/evaluation/evaluators/groundedness.py</span>
+<span class="kw">async def</span> evaluate(self, query: str, response: str, context: str) -> EvalResult:
+    payload = {
+        <span class="str">"model"</span>: os.getenv(<span class="str">"AZURE_OPENAI_MINI_DEPLOYMENT"</span>, <span class="str">"gpt-4o-mini"</span>),
+        <span class="str">"messages"</span>: [
+            {<span class="str">"role"</span>: <span class="str">"system"</span>, <span class="str">"content"</span>: GROUNDEDNESS_SYSTEM_PROMPT},
+            {<span class="str">"role"</span>: <span class="str">"user"</span>, <span class="str">"content"</span>: f<span class="str">"Context:\n{context}\n\nDraft:\n{response}"</span>},
+        ],
+        <span class="str">"response_format"</span>: {<span class="str">"type"</span>: <span class="str">"json_object"</span>},
+    }
+    <span class="kw">async with</span> httpx.AsyncClient() <span class="kw">as</span> client:
+        resp = <span class="kw">await</span> client.post(
+            f<span class="str">"{OPENAI_ENDPOINT}/openai/deployments/{MINI_DEPLOYMENT}/chat/completions?api-version=2024-08-01-preview"</span>,
+            json=payload, headers={<span class="str">"Authorization"</span>: f<span class="str">"Bearer {token}"</span>},
+        )
+    result = resp.json()[<span class="str">"choices"</span>][0][<span class="str">"message"</span>][<span class="str">"content"</span>]
+    score = json.loads(result)[<span class="str">"score"</span>]  <span class="comment"># 0.0–1.0 from rubric prompt</span>
+    <span class="kw">return</span> EvalResult(score=score, passed=score >= self.threshold, reason=...)</code></pre>
 
-results = evaluate(
-    data=eval_pairs_path,
-    evaluators={
-        <span class="str">"groundedness"</span>: GroundednessEvaluator(model_config),
-        <span class="str">"completeness"</span>: CompletenessEvaluator(model_config),
-        <span class="str">"parameter_accuracy"</span>: ParameterAccuracyEvaluator(),
-        <span class="str">"compliance"</span>: ComplianceEvaluator(phrase_list=REQUIRED_PHRASES),
-        <span class="str">"coherence"</span>: CoherenceEvaluator(model_config),
-    },
-    azure_ai_project=project_config,
-    output_path=<span class="str">"data/golden-dataset/eval_pairs.jsonl"</span>,
-)</code></pre>
-
-    <p>Key files: <code>src/evaluation/gate.py</code>, <code>src/evaluation/groundedness.py</code>, <code>src/evaluation/completeness.py</code>, <code>src/evaluation/parameter_accuracy.py</code>, <code>src/evaluation/compliance.py</code>, <code>src/evaluation/coherence.py</code>, <code>src/golden/annotator_cli.py</code>, <code>src/golden/eval_pairs.py</code>.</p>
+    <p>Key files: <code>src/evaluation/gate.py</code>, <code>src/evaluation/evaluators/groundedness.py</code>, <code>src/evaluation/evaluators/completeness.py</code>, <code>src/evaluation/evaluators/parameter_accuracy.py</code>, <code>src/evaluation/evaluators/compliance.py</code>, <code>src/evaluation/evaluators/coherence.py</code>.</p>
   </section>
 
   <!-- ── Content Safety ─────────────────────────────────────────────────────── -->
@@ -1047,9 +1073,9 @@ results = evaluate(
           </tr>
           <tr>
             <td><strong>Generated Drafts</strong></td>
-            <td>Outbound ← Evaluation Gate</td>
-            <td>On demand (per generation)</td>
-            <td><code>src/api/sharepoint_client.py</code></td>
+            <td>Outbound ← User approval</td>
+            <td>On demand — user clicks "Approve & Save to SharePoint"</td>
+            <td><code>src/api/sharepoint_client.py</code> via <code>POST /export/{draft_id}</code></td>
           </tr>
         </tbody>
       </table>
@@ -1057,13 +1083,24 @@ results = evaluate(
 
     <p>Key env vars: <code>SHAREPOINT_SITE_ID</code>, <code>SHAREPOINT_LIBRARY</code>, <code>SHAREPOINT_DRAFT_LIBRARY</code>. Site ID obtained via Graph API: <code>GET /sites/{hostname}:/{path}</code>.</p>
 
-    <h3>Word (.docx) output</h3>
-    <p>Gate-passing drafts are written as Word documents rather than Markdown, so program officers can edit them directly in SharePoint/Office Online without downloading. The <code>python-docx</code> library assembles the 8 sections with Word styles (Heading 0 cover title, Heading 1 per section, Normal body text). Content type on upload: <code>application/vnd.openxmlformats-officedocument.wordprocessingml.document</code>.</p>
+    <h3>Approval flow</h3>
+    <p>Draft upload is user-gated. When the evaluation gate passes, the draft is stored in an in-memory cache (<code>_draft_cache[draft_id]</code> on the FastAPI process) and an <strong>Approve &amp; Save to SharePoint</strong> button appears in the Teams Adaptive Card. The user clicks it → the bot calls <code>POST /export/{draft_id}</code> → <code>upload_draft_docx()</code> runs → the link is returned to the chat. If the container restarts between generation and approval, the cache is lost and the user sees a 404 (acceptable for a POC; a Redis or Cosmos cache would fix this for production).</p>
+
+    <h3>Markdown-to-Word conversion</h3>
+    <p>GPT-4o section output is Markdown. <code>sharepoint_client.py</code> converts it to native Word formatting before upload, so program officers see styled output in Office Online rather than raw syntax. Handled by <code>_render_section()</code> which calls:</p>
+    <ul style="margin: 0.5rem 0 0.75rem 1.5rem; color: var(--text-2);">
+      <li><code>_add_md_block(doc, line)</code> — <code>## Heading</code> → Word Heading style, <code>- bullet</code> → List Bullet, numbered lists, horizontal rules</li>
+      <li><code>_add_inline_md(paragraph, text)</code> — <code>**bold**</code> and <code>*italic*</code> → runs with bold/italic formatting</li>
+      <li><code>_render_md_table(doc, table_lines)</code> — pipe-delimited tables → Word Table Grid style with bold header row</li>
+    </ul>
+
     <pre><code><span class="comment"># sharepoint_client.py</span>
 <span class="kw">async def</span> upload_draft_docx(self, library_name, rfp_id, draft_id, sections, folder=<span class="str">"GeneratedDrafts"</span>):
-    docx_bytes = SharePointClient.draft_to_docx(rfp_id, sections)  <span class="comment"># python-docx → bytes</span>
+    docx_bytes = SharePointClient.draft_to_docx(rfp_id, sections)  <span class="comment"># MD→Word via python-docx</span>
     file_name = f<span class="str">"{rfp_id}_{draft_id}.docx"</span>
-    <span class="comment"># PUT to Graph API with Word content-type; returns webUrl for the Teams card button</span></code></pre>
+    upload_url = f<span class="str">"{GRAPH_BASE}/sites/{site_id}/drive/root:/{folder}/{file_name}:/content"</span>
+    <span class="comment"># PUT with application/vnd.openxmlformats-officedocument.wordprocessingml.document</span>
+    <span class="comment"># Returns item.webUrl for the Teams chat link</span></code></pre>
   </section>
 
   <!-- ── Fabric / OneLake ────────────────────────────────────────────────────── -->
