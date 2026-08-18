@@ -272,37 +272,45 @@ phase_4() {
   if [ -n "$existing_id" ] && [ "$existing_id" != "null" ]; then
     ok "Bot App ID already set on container: $existing_id"
     APP_ID="$existing_id"
-    if ask_yn "Skip bot credential setup?" "y"; then
-      return
+    # Check if the secret is already stored in azd env
+    local stored_secret; stored_secret=$(get_env BOT_APP_SECRET)
+    if [ -n "$stored_secret" ]; then
+      ok "BOT_APP_SECRET found in azd env — re-applying to container."
+      APP_PASSWORD="$stored_secret"
+    else
+      warn "BOT_APP_SECRET not in azd env — need to (re-)enter the client secret."
+      APP_PASSWORD=$(ask "Client secret for App Registration $APP_ID")
+      azd env set BOT_APP_SECRET "$APP_PASSWORD"
+      ok "BOT_APP_SECRET saved to AZD env"
     fi
-  fi
-
-  step_hdr "App Registration"
-  echo ""
-  if ask_yn "Do you have an existing App Registration to reuse?" "n"; then
-    APP_ID=$(ask "App Registration ID (appId)")
-    APP_PASSWORD=$(ask "Client secret (password)")
   else
-    local app_name; app_name=$(ask "App Registration display name" "pubhealth-rfp-bot")
-    info "Creating App Registration '$app_name'..."
-    APP_ID=$(az ad app create \
-      --display-name "$app_name" \
-      --sign-in-audience AzureADMyOrg \
-      --query appId -o tsv 2>/dev/null)
-    [ -z "$APP_ID" ] && die "Failed to create App Registration."
-    ok "Created: $APP_ID"
+    step_hdr "App Registration"
+    echo ""
+    if ask_yn "Do you have an existing App Registration to reuse?" "n"; then
+      APP_ID=$(ask "App Registration ID (appId)")
+      APP_PASSWORD=$(ask "Client secret (password)")
+    else
+      local app_name; app_name=$(ask "App Registration display name" "pubhealth-rfp-bot")
+      info "Creating App Registration '$app_name'..."
+      APP_ID=$(az ad app create \
+        --display-name "$app_name" \
+        --sign-in-audience AzureADMyOrg \
+        --query appId -o tsv 2>/dev/null)
+      [ -z "$APP_ID" ] && die "Failed to create App Registration."
+      ok "Created: $APP_ID"
 
-    info "Creating client secret (2-year expiry)..."
-    APP_PASSWORD=$(az ad app credential reset \
-      --id "$APP_ID" --years 2 \
-      --query password -o tsv 2>/dev/null)
-    [ -z "$APP_PASSWORD" ] && die "Failed to create client secret."
-    ok "Secret created."
+      info "Creating client secret (2-year expiry)..."
+      APP_PASSWORD=$(az ad app credential reset \
+        --id "$APP_ID" --years 2 \
+        --query password -o tsv 2>/dev/null)
+      [ -z "$APP_PASSWORD" ] && die "Failed to create client secret."
+      ok "Secret created."
+    fi
+
+    step_hdr "Apply credentials"
+    azd env set BOT_APP_SECRET "$APP_PASSWORD"
+    ok "BOT_APP_SECRET saved to AZD env"
   fi
-
-  step_hdr "Apply credentials"
-  azd env set BOT_APP_SECRET "$APP_PASSWORD"
-  ok "BOT_APP_SECRET saved to AZD env"
 
   local image; image=$(az containerapp show -n "$API_APP" -g "$RG" \
     --query "properties.template.containers[0].image" -o tsv 2>/dev/null)
