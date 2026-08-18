@@ -52,7 +52,7 @@ def create_rfp_index() -> None:
     )
 
     semantic_config = SemanticConfiguration(
-        name="rfp-semantic-config",
+        name="pubhealth-rfp-semantic",
         prioritized_fields=SemanticPrioritizedFields(
             title_field=SemanticField(field_name="section_type"),
             content_fields=[SemanticField(field_name="content")],
@@ -64,7 +64,7 @@ def create_rfp_index() -> None:
         name=INDEX_NAME,
         fields=fields,
         vector_search=vector_search,
-        semantic_search=SemanticSearch(configurations=[semantic_config], default_configuration_name="rfp-semantic-config"),
+        semantic_search=SemanticSearch(configurations=[semantic_config], default_configuration_name="pubhealth-rfp-semantic"),
     )
 
     client.create_or_update_index(index)
