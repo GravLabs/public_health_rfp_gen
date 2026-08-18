@@ -1,0 +1,755 @@
+<title>RFP Generator Quickstart</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+/* ── Tokens ──────────────────────────────────────────────────────────────── */
+:root {
+  --ground:       #0B0F1A;
+  --surface:      #111827;
+  --surface-2:    #1C2A40;
+  --border:       #243348;
+  --border-soft:  #1A2840;
+  --text-1:       #F1F5F9;
+  --text-2:       #94A3B8;
+  --text-3:       #4B6075;
+  --accent:       #38BDF8;
+  --accent-dim:   #0C2D42;
+  --green:        #4ADE80;
+  --green-dim:    #052915;
+  --amber:        #F59E0B;
+  --amber-dim:    #281900;
+  --red:          #F87171;
+  --red-dim:      #2D0808;
+  --mono:         'IBM Plex Mono', 'Cascadia Code', 'Consolas', monospace;
+  --sans:         'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --sidebar-w:    232px;
+  --radius:       5px;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --ground:      #F0F4F8;
+    --surface:     #FFFFFF;
+    --surface-2:   #E8EDF4;
+    --border:      #C8D5E4;
+    --border-soft: #DCE6F0;
+    --text-1:      #0F172A;
+    --text-2:      #334155;
+    --text-3:      #7A92AB;
+    --accent:      #0369A1;
+    --accent-dim:  #DBEAFE;
+    --green:       #059669;
+    --green-dim:   #D1FAE5;
+    --amber:       #B45309;
+    --amber-dim:   #FEF3C7;
+    --red:         #B91C1C;
+    --red-dim:     #FEE2E2;
+  }
+}
+:root[data-theme="light"] {
+  --ground:      #F0F4F8;
+  --surface:     #FFFFFF;
+  --surface-2:   #E8EDF4;
+  --border:      #C8D5E4;
+  --border-soft: #DCE6F0;
+  --text-1:      #0F172A;
+  --text-2:      #334155;
+  --text-3:      #7A92AB;
+  --accent:      #0369A1;
+  --accent-dim:  #DBEAFE;
+  --green:       #059669;
+  --green-dim:   #D1FAE5;
+  --amber:       #B45309;
+  --amber-dim:   #FEF3C7;
+  --red:         #B91C1C;
+  --red-dim:     #FEE2E2;
+}
+
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px;scroll-behavior:smooth}
+body{background:var(--ground);color:var(--text-1);font-family:var(--sans);line-height:1.65;display:flex;min-height:100vh}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ── Progress bar ────────────────────────────────────────────────────────── */
+.progress-bar{position:fixed;top:0;left:var(--sidebar-w);right:0;height:2px;background:var(--border);z-index:200}
+.progress-fill{height:100%;background:var(--accent);width:0%;transition:width .4s ease}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.sidebar{
+  width:var(--sidebar-w);flex-shrink:0;
+  background:var(--surface);border-right:1px solid var(--border);
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+  display:flex;flex-direction:column;
+  padding:1.75rem 0 2rem;
+}
+.sb-brand{padding:0 1.5rem 1.5rem;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
+.sb-name{font-family:var(--mono);font-size:.7rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.sb-sub{font-size:.75rem;color:var(--text-3);margin-top:3px}
+
+.phase-nav{list-style:none;padding:0 1rem;flex:1}
+.pn-item{position:relative;padding-left:1.8rem;margin-bottom:.15rem}
+.pn-item:not(:last-child)::after{
+  content:'';position:absolute;left:.575rem;top:1.6rem;bottom:0;
+  width:1px;background:var(--border);
+}
+.pn-dot{
+  position:absolute;left:.2rem;top:.55rem;
+  width:.75rem;height:.75rem;border-radius:50%;
+  border:2px solid var(--border);background:var(--ground);
+  transition:background .25s,border-color .25s;
+}
+.pn-dot.partial{border-color:var(--accent);background:var(--accent-dim)}
+.pn-dot.done   {border-color:var(--green); background:var(--green)}
+.pn-link{
+  display:block;padding:.45rem .5rem;border-radius:var(--radius);
+  text-decoration:none;color:var(--text-2);font-size:.8rem;
+  transition:color .15s,background .15s;
+}
+.pn-link:hover{color:var(--text-1);background:var(--surface-2)}
+.pn-link.active{color:var(--text-1);font-weight:500}
+.pn-time{display:block;font-family:var(--mono);font-size:.65rem;color:var(--text-3);margin-top:1px}
+
+.sb-verify{margin:1.5rem 1rem 0;padding:.9rem 1rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius)}
+.sb-verify-label{font-family:var(--mono);font-size:.65rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:.4rem}
+.sb-verify pre{background:var(--ground);border:1px solid var(--border);border-radius:3px;padding:.4rem .6rem;font-size:.7rem;color:var(--text-2);overflow-x:auto}
+
+/* ── Main ────────────────────────────────────────────────────────────────── */
+.main{flex:1;min-width:0;max-width:780px;padding:3rem 2.5rem 6rem;margin:0 auto}
+
+/* ── Hero ────────────────────────────────────────────────────────────────── */
+.hero{margin-bottom:3rem}
+.hero-eye{font-family:var(--mono);font-size:.7rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+.hero h1{font-size:1.9rem;font-weight:600;line-height:1.25;text-wrap:balance;margin-bottom:.6rem}
+.hero-sub{color:var(--text-2);font-size:.93rem;max-width:56ch}
+
+.timeline{
+  display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.5rem;
+  padding:1rem 1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+}
+.tl-item{display:flex;flex-direction:column;gap:2px}
+.tl-label{font-family:var(--mono);font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+.tl-val{font-size:.85rem;font-weight:500}
+
+/* ── Phase section ───────────────────────────────────────────────────────── */
+.phase{margin-bottom:4rem;scroll-margin-top:1.5rem}
+.phase-hd{
+  display:flex;align-items:baseline;gap:.9rem;
+  padding-bottom:.75rem;border-bottom:1px solid var(--border);margin-bottom:1.25rem;
+}
+.phase-num{font-family:var(--mono);font-size:.7rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);flex-shrink:0}
+.phase-title{font-size:1.15rem;font-weight:600}
+.phase-time{margin-left:auto;font-family:var(--mono);font-size:.68rem;color:var(--text-3);flex-shrink:0}
+.phase-desc{color:var(--text-2);font-size:.88rem;margin-bottom:1.5rem;max-width:62ch;line-height:1.7}
+
+/* ── Step ────────────────────────────────────────────────────────────────── */
+.step{display:flex;gap:1rem;margin-bottom:1.5rem;align-items:flex-start}
+.step-cb{
+  flex-shrink:0;margin-top:.25rem;
+  width:1rem;height:1rem;border-radius:3px;
+  border:2px solid var(--border);background:var(--surface);
+  appearance:none;-webkit-appearance:none;cursor:pointer;
+  position:relative;transition:background .15s,border-color .15s;
+}
+.step-cb:checked{background:var(--green);border-color:var(--green)}
+.step-cb:checked::after{
+  content:'';position:absolute;
+  left:2px;top:-1px;width:6px;height:10px;
+  border:2px solid var(--ground);border-left:0;border-top:0;
+  transform:rotate(44deg);
+}
+.step-body{flex:1;min-width:0}
+.step-label{font-size:.9rem;font-weight:500;margin-bottom:.3rem}
+.step-desc{font-size:.83rem;color:var(--text-2);margin-bottom:.5rem;line-height:1.65}
+
+/* ── Code ────────────────────────────────────────────────────────────────── */
+.code-wrap{position:relative;margin:.4rem 0 .25rem}
+pre{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:.85rem 2.5rem .85rem 1rem;overflow-x:auto;
+  font-family:var(--mono);font-size:.76rem;line-height:1.65;color:var(--text-1);
+}
+.copy-btn{
+  position:absolute;top:.4rem;right:.4rem;
+  background:var(--surface-2);border:1px solid var(--border);color:var(--text-3);
+  border-radius:3px;padding:.18rem .45rem;font-family:var(--mono);font-size:.62rem;
+  cursor:pointer;transition:color .15s,border-color .15s;
+}
+.copy-btn:hover{color:var(--text-1);border-color:var(--text-2)}
+.copy-btn.ok{color:var(--green);border-color:var(--green)}
+
+/* ── Callouts ────────────────────────────────────────────────────────────── */
+.callout{
+  display:flex;gap:.75rem;padding:.85rem 1rem;border-radius:var(--radius);
+  font-size:.83rem;margin:.75rem 0;border:1px solid;line-height:1.6;
+}
+.callout-icon{flex-shrink:0;font-size:.95rem;margin-top:.05rem}
+.callout-body{flex:1}
+.callout-body strong{display:block;margin-bottom:.15rem;font-size:.85rem}
+.callout.warn   {background:var(--amber-dim);border-color:var(--amber)}
+.callout.info   {background:var(--accent-dim);border-color:var(--accent)}
+.callout.success{background:var(--green-dim);border-color:var(--green)}
+
+/* ── Inline code ─────────────────────────────────────────────────────────── */
+code{
+  font-family:var(--mono);font-size:.8em;
+  background:var(--surface-2);border:1px solid var(--border-soft);
+  border-radius:3px;padding:.1em .35em;
+}
+
+/* ── Final prompt box ────────────────────────────────────────────────────── */
+.prompt-box{
+  background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius);
+  padding:1.25rem 1.5rem;margin-top:1.5rem;
+}
+.prompt-box-label{font-family:var(--mono);font-size:.65rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.prompt-text{font-size:.92rem;line-height:1.7}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media(max-width:680px){
+  .sidebar{display:none}
+  .progress-bar{left:0}
+  .main{padding:2rem 1.25rem 4rem}
+}
+</style>
+
+<!-- Progress bar -->
+<div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+<nav class="sidebar" aria-label="Setup phases">
+  <div class="sb-brand">
+    <div class="sb-name">RFP Generator</div>
+    <div class="sb-sub">Setup Guide</div>
+  </div>
+
+  <ul class="phase-nav" id="phaseNav">
+    <li class="pn-item">
+      <span class="pn-dot" id="dot-1"></span>
+      <a href="#phase-1" class="pn-link">
+        Prerequisites
+        <span class="pn-time">~5 min</span>
+      </a>
+    </li>
+    <li class="pn-item">
+      <span class="pn-dot" id="dot-2"></span>
+      <a href="#phase-2" class="pn-link">
+        Deploy to Azure
+        <span class="pn-time">~25 min</span>
+      </a>
+    </li>
+    <li class="pn-item">
+      <span class="pn-dot" id="dot-3"></span>
+      <a href="#phase-3" class="pn-link">
+        Teams Bot Setup
+        <span class="pn-time">~10 min</span>
+      </a>
+    </li>
+    <li class="pn-item">
+      <span class="pn-dot" id="dot-4"></span>
+      <a href="#phase-4" class="pn-link">
+        Teams App Install
+        <span class="pn-time">~5 min</span>
+      </a>
+    </li>
+    <li class="pn-item">
+      <span class="pn-dot" id="dot-5"></span>
+      <a href="#phase-5" class="pn-link">
+        SharePoint Access
+        <span class="pn-time">~5 min</span>
+      </a>
+    </li>
+    <li class="pn-item">
+      <span class="pn-dot" id="dot-6"></span>
+      <a href="#phase-6" class="pn-link">
+        Verify &amp; First Prompt
+        <span class="pn-time">~3 min</span>
+      </a>
+    </li>
+  </ul>
+
+  <div class="sb-verify">
+    <div class="sb-verify-label">Verify any phase</div>
+    <pre>bash scripts/verify-setup.sh</pre>
+  </div>
+</nav>
+
+<main class="main">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-eye">End-to-end Setup</div>
+    <h1>Public Health RFP Generator</h1>
+    <p class="hero-sub">Six phases take you from a fresh clone to a working Teams bot that drafts, evaluates, and uploads RFPs to SharePoint. Check off each step as you go — progress is saved in your browser.</p>
+    <div class="timeline">
+      <div class="tl-item"><span class="tl-label">Total time</span><span class="tl-val">~50 min</span></div>
+      <div class="tl-item"><span class="tl-label">Azure cost</span><span class="tl-val">~$0.50 to provision</span></div>
+      <div class="tl-item"><span class="tl-label">Teams access</span><span class="tl-val">Required (admin or custom app upload)</span></div>
+      <div class="tl-item"><span class="tl-label">SharePoint</span><span class="tl-val">Optional (Phase 5)</span></div>
+    </div>
+  </div>
+
+  <!-- ── Phase 1: Prerequisites ───────────────────────────────────────────── -->
+  <section class="phase" id="phase-1">
+    <div class="phase-hd">
+      <span class="phase-num">Phase 01</span>
+      <h2 class="phase-title">Prerequisites</h2>
+      <span class="phase-time">~5 min</span>
+    </div>
+    <p class="phase-desc">Install all four CLI tools before cloning the repo. Run the version checks to confirm each is ready.</p>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p1-az" data-phase="1">
+      <div class="step-body">
+        <div class="step-label">Azure CLI ≥ 2.60</div>
+        <div class="step-desc">Used for all ARM / resource management commands.</div>
+        <div class="code-wrap"><pre># Linux/macOS
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+# Windows
+winget install Microsoft.AzureCLI
+
+# Verify
+az version</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p1-azd" data-phase="1">
+      <div class="step-body">
+        <div class="step-label">Azure Developer CLI (azd) ≥ 1.9</div>
+        <div class="step-desc">Orchestrates provision + deploy + hooks in a single command.</div>
+        <div class="code-wrap"><pre># Linux/macOS
+curl -fsSL https://aka.ms/install-azd.sh | bash
+
+# Windows
+winget install Microsoft.Azd
+
+# Verify
+azd version</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p1-dotnet" data-phase="1">
+      <div class="step-body">
+        <div class="step-label">.NET SDK 8</div>
+        <div class="step-desc">Required to build the Semantic Kernel orchestrator container.</div>
+        <div class="code-wrap"><pre># Linux
+wget https://dot.net/v1/dotnet-install.sh && bash dotnet-install.sh --channel 8.0
+
+# Windows
+winget install Microsoft.DotNet.SDK.8
+
+# Verify
+dotnet --version   # need 8.x</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p1-py" data-phase="1">
+      <div class="step-body">
+        <div class="step-label">Python 3.12 + Docker</div>
+        <div class="step-desc">Python runs the ingestion pipeline and post-provision hook. Docker builds container images.</div>
+        <div class="code-wrap"><pre># Python — Ubuntu/Debian
+sudo apt install python3.12 python3.12-venv python3-pip -y
+
+# Python — Windows
+winget install Python.Python.3.12
+
+# Docker Desktop: https://www.docker.com/products/docker-desktop
+# Verify both
+python3 --version && docker info | head -3</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Phase 2: Deploy to Azure ─────────────────────────────────────────── -->
+  <section class="phase" id="phase-2">
+    <div class="phase-hd">
+      <span class="phase-num">Phase 02</span>
+      <h2 class="phase-title">Deploy to Azure</h2>
+      <span class="phase-time">~25 min</span>
+    </div>
+    <p class="phase-desc"><code>azd up</code> provisions all Azure resources via Bicep, builds and pushes Docker images, then runs the post-provision hook that indexes the RFP corpus and writes <code>.env</code>. Go get a coffee — it takes about 20 minutes.</p>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p2-clone" data-phase="2">
+      <div class="step-body">
+        <div class="step-label">Clone and authenticate</div>
+        <div class="code-wrap"><pre>git clone https://github.com/GravLabs/public_health_rfp_gen.git
+cd public_health_rfp_gen
+
+az login
+azd auth login</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p2-env" data-phase="2">
+      <div class="step-body">
+        <div class="step-label">Create environment and set required variables</div>
+        <div class="code-wrap"><pre>azd env new pubhealth-rfp-poc
+azd env set AZURE_LOCATION eastus
+azd env set APIM_PUBLISHER_EMAIL "you@example.com"
+azd env set OWNER_EMAIL          "you@example.com"</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p2-up" data-phase="2">
+      <div class="step-body">
+        <div class="step-label">Deploy everything</div>
+        <div class="code-wrap"><pre>azd up</pre><button class="copy-btn">copy</button></div>
+        <div class="step-desc">Runs three phases automatically: Bicep provision (~15 min) → Docker build &amp; push → post-provision hook (corpus upload, Search index, AI Foundry env vars, bot App ID restore).</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p2-verify" data-phase="2">
+      <div class="step-body">
+        <div class="step-label">Confirm Container Apps are running</div>
+        <div class="code-wrap"><pre>RG=$(azd env get-value AZURE_RESOURCE_GROUP)
+az containerapp list -g $RG --query "[].{name:name,state:properties.latestRevisionName}" -o table</pre><button class="copy-btn">copy</button></div>
+        <div class="step-desc">You should see two rows: <code>ca-pubhealth-api-*</code> and <code>ca-pubhealth-orch-*</code>.</div>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <span class="callout-icon">⚠</span>
+      <div class="callout-body">
+        <strong>Use <code>azd deploy</code>, not <code>azd provision</code>, for code changes</strong>
+        Running <code>azd provision</code> re-runs Bicep and can reset secure parameters. The post-provision hook restores the bot App ID, but it is slower. Only run <code>azd provision</code> when you are changing infrastructure.
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Phase 3: Teams Bot Setup ─────────────────────────────────────────── -->
+  <section class="phase" id="phase-3">
+    <div class="phase-hd">
+      <span class="phase-num">Phase 03</span>
+      <h2 class="phase-title">Teams Bot Setup</h2>
+      <span class="phase-time">~10 min</span>
+    </div>
+    <p class="phase-desc">The bot identity is a one-time manual step — <code>azd up</code> provisions the Bot Service but cannot create or own an App Registration for you. Do this once; the post-provision hook preserves it on future deploys.</p>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p3-appreg" data-phase="3">
+      <div class="step-body">
+        <div class="step-label">Create App Registration</div>
+        <div class="code-wrap"><pre># Creates the identity the bot uses to authenticate with Bot Framework
+az ad app create \
+  --display-name "pubhealth-rfp-bot" \
+  --sign-in-audience AzureADMyOrg
+
+# Note the "appId" from the output — you need it below
+APP_ID="&lt;appId-from-output&gt;"</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p3-secret" data-phase="3">
+      <div class="step-body">
+        <div class="step-label">Create a client secret</div>
+        <div class="code-wrap"><pre>az ad app credential reset --id $APP_ID --years 2
+# Note the "password" from the output
+
+APP_PASSWORD="&lt;password-from-output&gt;"</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p3-container" data-phase="3">
+      <div class="step-body">
+        <div class="step-label">Set credentials on the API container</div>
+        <div class="code-wrap"><pre>azd env set BOT_APP_SECRET "$APP_PASSWORD"
+
+RG=$(azd env get-value AZURE_RESOURCE_GROUP)
+API_APP=$(az containerapp list -g $RG \
+  --query "[?tags.\"azd-service-name\"=='api'].name|[0]" -o tsv)
+IMAGE=$(az containerapp show -n $API_APP -g $RG \
+  --query "properties.template.containers[0].image" -o tsv)
+
+az containerapp update -n $API_APP -g $RG \
+  --image "$IMAGE" \
+  --set-env-vars \
+    "MICROSOFT_APP_ID=$APP_ID" \
+    "MICROSOFT_APP_PASSWORD=$APP_PASSWORD" \
+  --revision-suffix botinit \
+  --output none
+
+echo "Done — container updated."</pre><button class="copy-btn">copy</button></div>
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <div class="callout-body">Always pass <code>--image "$IMAGE"</code> when updating env vars. Omitting it creates a stuck "Activating" revision on this Container Apps environment.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p3-bot" data-phase="3">
+      <div class="step-body">
+        <div class="step-label">Point the Bot Service at the API endpoint</div>
+        <div class="code-wrap"><pre>BOT_NAME=$(az resource list -g $RG \
+  --resource-type Microsoft.BotService/botServices \
+  --query "[0].name" -o tsv)
+FQDN=$(az containerapp show -n $API_APP -g $RG \
+  --query "properties.configuration.ingress.fqdn" -o tsv)
+
+az bot update -g $RG -n $BOT_NAME \
+  --endpoint "https://$FQDN/api/messages"
+
+echo "Bot endpoint: https://$FQDN/api/messages"</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Phase 4: Teams App Install ───────────────────────────────────────── -->
+  <section class="phase" id="phase-4">
+    <div class="phase-hd">
+      <span class="phase-num">Phase 04</span>
+      <h2 class="phase-title">Teams App Install</h2>
+      <span class="phase-time">~5 min</span>
+    </div>
+    <p class="phase-desc">The Teams manifest ties the Teams app to your App Registration. Update it with the App ID from Phase 3, rebuild the ZIP, and upload it to Teams.</p>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p4-manifest" data-phase="4">
+      <div class="step-body">
+        <div class="step-label">Update manifest.json with your App ID</div>
+        <div class="step-desc">Open <code>teams-app/manifest.json</code> and replace both <code>"id"</code> and <code>bots[0].botId</code> with your <code>$APP_ID</code> from Phase 3.</div>
+        <div class="code-wrap"><pre># Quick sed replacement (or edit manually in your editor)
+sed -i "s/26b9c245-880d-458b-9edf-809c1a7f534a/$APP_ID/g" \
+  teams-app/manifest.json
+
+# Verify both values updated
+grep -E '"id"|botId' teams-app/manifest.json</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p4-zip" data-phase="4">
+      <div class="step-body">
+        <div class="step-label">Rebuild the app package ZIP</div>
+        <div class="code-wrap"><pre>cd teams-app
+zip -j pubhealth-rfp-bot.zip manifest.json color.png outline.png
+cd ..</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p4-upload" data-phase="4">
+      <div class="step-body">
+        <div class="step-label">Upload to Teams</div>
+        <div class="step-desc">Two options depending on your tenant permissions:</div>
+        <div class="step-desc"><strong>Option A — Teams Admin Center</strong> (if you have admin access): go to <em>Teams Admin Center → Manage apps → Upload new app</em>, upload <code>pubhealth-rfp-bot.zip</code>.</div>
+        <div class="step-desc"><strong>Option B — Sideload</strong> (if custom app upload is enabled): in Teams, go to <em>Apps → Upload a custom app</em>, select <code>pubhealth-rfp-bot.zip</code>.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p4-chat" data-phase="4">
+      <div class="step-body">
+        <div class="step-label">Open the bot in Teams and send a ping</div>
+        <div class="step-desc">Search for <em>RFP Generator Bot</em> in Teams → Apps → open a chat. Send <code>hi</code>. The bot should respond with its capability menu. If you see nothing after 10 seconds, check the API container logs.</div>
+        <div class="code-wrap"><pre># Tail API container logs if the bot doesn't respond
+az containerapp logs show -n $API_APP -g $RG --follow</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Phase 5: SharePoint ───────────────────────────────────────────────── -->
+  <section class="phase" id="phase-5">
+    <div class="phase-hd">
+      <span class="phase-num">Phase 05</span>
+      <h2 class="phase-title">SharePoint Access</h2>
+      <span class="phase-time">~5 min</span>
+    </div>
+    <p class="phase-desc">Required for the "Approve &amp; Save to SharePoint" button. The managed identity needs <code>Sites.ReadWrite.All</code> on Microsoft Graph. Skip this phase if you don't need SharePoint upload.</p>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p5-role" data-phase="5">
+      <div class="step-body">
+        <div class="step-label">Assign Sites.ReadWrite.All to the managed identity</div>
+        <div class="code-wrap"><pre>MI_OID=$(az identity list -g $RG --query "[0].principalId" -o tsv)
+GRAPH_SP=$(az ad sp show --id 00000003-0000-0000-c000-000000000000 --query id -o tsv)
+ROLE_ID="9492366f-7969-46a4-8d15-ed1a20078fff"   # Sites.ReadWrite.All
+
+az rest --method POST \
+  --url "https://graph.microsoft.com/v1.0/servicePrincipals/$MI_OID/appRoleAssignments" \
+  --body "{\"principalId\":\"$MI_OID\",\"resourceId\":\"$GRAPH_SP\",\"appRoleId\":\"$ROLE_ID\"}"
+
+echo "Role assigned to managed identity $MI_OID"</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p5-siteid" data-phase="5">
+      <div class="step-body">
+        <div class="step-label">Get your SharePoint site ID</div>
+        <div class="step-desc">Replace <code>contoso.sharepoint.com</code> and <code>/sites/yoursite</code> with your tenant and site path.</div>
+        <div class="code-wrap"><pre>az rest --method GET \
+  --url "https://graph.microsoft.com/v1.0/sites/contoso.sharepoint.com:/sites/yoursite" \
+  --query id -o tsv
+# Output format: contoso.sharepoint.com,&lt;site-guid&gt;,&lt;web-guid&gt;</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p5-env" data-phase="5">
+      <div class="step-body">
+        <div class="step-label">Set SharePoint env vars on the API container</div>
+        <div class="code-wrap"><pre>SITE_ID="&lt;output-from-above&gt;"
+IMAGE=$(az containerapp show -n $API_APP -g $RG \
+  --query "properties.template.containers[0].image" -o tsv)
+
+az containerapp update -n $API_APP -g $RG \
+  --image "$IMAGE" \
+  --set-env-vars \
+    "SHAREPOINT_SITE_ID=$SITE_ID" \
+    "SHAREPOINT_DRAFT_LIBRARY=Generated Drafts" \
+  --revision-suffix sharepointinit \
+  --output none
+
+echo "SharePoint configured."</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Phase 6: Verify & First Prompt ───────────────────────────────────── -->
+  <section class="phase" id="phase-6">
+    <div class="phase-hd">
+      <span class="phase-num">Phase 06</span>
+      <h2 class="phase-title">Verify &amp; First Prompt</h2>
+      <span class="phase-time">~3 min</span>
+    </div>
+    <p class="phase-desc">Run the verification script to confirm every phase passed, then send your first prompt in Teams.</p>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p6-verify" data-phase="6">
+      <div class="step-body">
+        <div class="step-label">Run the setup verifier</div>
+        <div class="step-desc">Checks prerequisites, AZD env vars, container status, OpenAI deployments, search index doc count, bot credentials consistency, and fires a live smoke test against <code>/classify</code>.</div>
+        <div class="code-wrap"><pre>bash scripts/verify-setup.sh</pre><button class="copy-btn">copy</button></div>
+        <div class="step-desc">All checks should be green. Warnings on SharePoint env vars are OK if you skipped Phase 5.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p6-classify" data-phase="6">
+      <div class="step-body">
+        <div class="step-label">Quick API smoke test (optional — before opening Teams)</div>
+        <div class="code-wrap"><pre>FQDN=$(az containerapp show -n $API_APP -g $RG \
+  --query "properties.configuration.ingress.fqdn" -o tsv)
+
+curl -s -X POST "https://$FQDN/classify" \
+  -H "Content-Type: application/json" \
+  -d '{"description":"influenza surveillance program, CDC, 24 months"}' | python3 -m json.tool</pre><button class="copy-btn">copy</button></div>
+        <div class="step-desc">Expected: <code>{"program_area": "Influenza Surveillance", "confidence": 0.96, ...}</code></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <input type="checkbox" class="step-cb" id="p6-prompt" data-phase="6">
+      <div class="step-body">
+        <div class="step-label">Send your first prompt in Teams</div>
+        <div class="step-desc">Open the RFP Generator Bot in Teams. You should see sections appear live in the card as each of the 8 sections completes (~2–3 min). When the gate passes, an <strong>Approve &amp; Save to SharePoint</strong> button appears.</div>
+        <div class="prompt-box">
+          <div class="prompt-box-label">First prompt — paste this exactly</div>
+          <div class="prompt-text">Draft a 24-month influenza surveillance RFP. CDC funding, $2.5M total, awards between $150K–$400K, no cost share required.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout success">
+      <span class="callout-icon">✓</span>
+      <div class="callout-body">
+        <strong>You're live.</strong>
+        Try the other four capabilities: <code>Classify: whole genome sequencing surveillance program</code> · <code>Any recent CFR changes affecting public health labs?</code> · attach a proposal PDF and say <code>Review this proposal against RFP-2024-FLU-027</code> · paste a budget narrative and say <code>Audit this budget</code>.
+      </div>
+    </div>
+
+    <div class="callout info" style="margin-top:1rem">
+      <span class="callout-icon">ℹ</span>
+      <div class="callout-body">
+        <strong>Future code changes</strong>
+        Use <code>azd deploy</code> — it rebuilds and pushes only the changed container(s) without touching infrastructure. <code>azd provision</code> is for infra-only changes and is slower.
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+const STORAGE_KEY = 'rfp-qs-checks';
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+  catch { return {}; }
+}
+
+function saveState(state) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch {}
+}
+
+function updateProgress() {
+  const state = loadState();
+  const allBoxes = document.querySelectorAll('.step-cb');
+  const checkedCount = Array.from(allBoxes).filter(cb => state[cb.id]).length;
+  const pct = allBoxes.length > 0 ? (checkedCount / allBoxes.length) * 100 : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+
+  // Update phase dots
+  [1,2,3,4,5,6].forEach(phase => {
+    const boxes = document.querySelectorAll(`[data-phase="${phase}"]`);
+    const checked = Array.from(boxes).filter(cb => state[cb.id]).length;
+    const dot = document.getElementById('dot-' + phase);
+    if (!dot) return;
+    dot.className = 'pn-dot';
+    if (checked === boxes.length && boxes.length > 0) dot.classList.add('done');
+    else if (checked > 0) dot.classList.add('partial');
+  });
+}
+
+// Restore checkboxes from storage
+document.addEventListener('DOMContentLoaded', () => {
+  const state = loadState();
+  document.querySelectorAll('.step-cb').forEach(cb => {
+    if (state[cb.id]) cb.checked = true;
+    cb.addEventListener('change', () => {
+      const s = loadState();
+      s[cb.id] = cb.checked;
+      saveState(s);
+      updateProgress();
+    });
+  });
+  updateProgress();
+
+  // Copy buttons
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pre = btn.closest('.code-wrap').querySelector('pre');
+      navigator.clipboard.writeText(pre.textContent).then(() => {
+        btn.textContent = 'copied';
+        btn.classList.add('ok');
+        setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('ok'); }, 1800);
+      }).catch(() => {});
+    });
+  });
+
+  // Active phase highlight in sidebar
+  const sections = document.querySelectorAll('.phase');
+  const links = document.querySelectorAll('.pn-link');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const id = e.target.id;
+        const num = id.replace('phase-', '');
+        const link = document.querySelector(`.pn-link[href="#${id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  sections.forEach(s => observer.observe(s));
+});
+</script>

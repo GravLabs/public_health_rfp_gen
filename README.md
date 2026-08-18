@@ -11,6 +11,7 @@
 
 | Audience | Document |
 |---|---|
+| Anyone setting up for the first time | [Setup Quickstart](https://gravlabs.github.io/public_health_rfp_gen/quickstart.html) |
 | Program Officers, Grants Administrators, Compliance Officers | [Business Overview](https://gravlabs.github.io/public_health_rfp_gen/business.html) |
 | Engineers and Cloud Architects | [Technical Architecture Reference](https://gravlabs.github.io/public_health_rfp_gen/technical.html) |
 
