@@ -108,23 +108,6 @@ resource backendFineTuned 'Microsoft.ApiManagement/service/backends@2023-09-01-p
   }
 }
 
-// ── Backend pool (fine-tuned primary, base fallback) ─────────────────────────
-resource backendPool 'Microsoft.ApiManagement/service/backends@2023-09-01-preview' = {
-  parent: apim
-  name: 'openai-pool'
-  properties: {
-    description: 'Load-balanced pool: fine-tuned GPT-4o (priority 1) → base GPT-4o (priority 2)'
-    type: 'Pool'
-    pool: {
-      services: empty(openAiFineTunedEndpoint) ? [
-        { id: backendBase.id, priority: 1, weight: 100 }
-      ] : [
-        { id: backendFineTuned.id, priority: 1, weight: 100 }
-        { id: backendBase.id,      priority: 2, weight: 100 }
-      ]
-    }
-  }
-}
 
 // ── OpenAI API surface ────────────────────────────────────────────────────────
 resource api 'Microsoft.ApiManagement/service/apis@2023-09-01-preview' = {
@@ -180,7 +163,7 @@ resource apiPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-09-01-pre
   <inbound>
     <base />
     <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
-    <set-backend-service backend-id="openai-pool" />
+    <set-backend-service backend-id="openai-base" />
   </inbound>
   <backend>
     <base />
