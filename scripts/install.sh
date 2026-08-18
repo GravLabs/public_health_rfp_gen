@@ -72,7 +72,7 @@ press_enter() {
 
 die() { err "$1"; exit 1; }
 
-get_env() { azd env get-value "$1" 2>/dev/null || true; }
+get_env() { local v; v=$(azd env get-value "$1" 2>/dev/null) && echo "$v" || true; }
 
 # Global state (set across phases)
 APP_ID=""

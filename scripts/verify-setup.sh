@@ -16,7 +16,7 @@ warn() { printf "  ${AMBER}⚠${NC}  %s\n" "$1"; ((WARN++)) || true; }
 info() { printf "  ${DIM}·${NC}  %s\n" "$1"; }
 hdr()  { printf "\n${BOLD}${CYAN}── %s ──${NC}\n" "$1"; }
 
-get_env() { azd env get-value "$1" 2>/dev/null || true; }
+get_env() { local v; v=$(azd env get-value "$1" 2>/dev/null) && echo "$v" || true; }
 
 semver_ok() {
   local ver="$1" min="$2"
