@@ -4,7 +4,7 @@ param tags object = {}
 param skuName string = 'basic'
 param identityPrincipalId string
 
-resource search 'Microsoft.Search/searchServices@2023-11-01' = {
+resource search 'Microsoft.Search/searchServices@2024-03-01-preview' = {
   name: name
   location: location
   tags: tags
@@ -17,6 +17,11 @@ resource search 'Microsoft.Search/searchServices@2023-11-01' = {
     hostingMode: 'default'
     publicNetworkAccess: 'enabled'
     semanticSearch: 'standard'  // Enable semantic ranker
+    authOptions: {
+      aadOrApiKey: {
+        aadAuthFailureMode: 'http403'
+      }
+    }
   }
   identity: {
     type: 'SystemAssigned'
