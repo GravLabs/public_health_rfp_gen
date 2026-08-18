@@ -442,25 +442,46 @@ phase_6() {
     || warn "Role assignment returned an error — it may already be assigned."
 
   step_hdr "SharePoint site"
-  local sp_host; sp_host=$(ask "SharePoint hostname" "yourorg.sharepoint.com")
-  local sp_path; sp_path=$(ask "Site path" "/sites/yoursite")
 
-  info "Looking up site ID via Graph API..."
-  local site_id; site_id=$(az rest --method GET \
-    --url "https://graph.microsoft.com/v1.0/sites/${sp_host}:${sp_path}" \
-    --query id -o tsv 2>/dev/null || true)
+  # Check azd env for previously saved values
+  local stored_site_id; stored_site_id=$(get_env SHAREPOINT_SITE_ID)
+  local stored_library; stored_library=$(get_env SHAREPOINT_DRAFT_LIBRARY)
 
-  if [ -z "$site_id" ]; then
-    err "Could not retrieve site ID. Check the hostname and path."
-    info "You can set it manually later:"
-    info "  az containerapp update -n $API_APP -g $RG --image '$image' \\"
-    info "    --set-env-vars \"SHAREPOINT_SITE_ID=<id>\" \"SHAREPOINT_DRAFT_LIBRARY=Generated Drafts\" \\"
-    info "    --revision-suffix spfix"
-    return
+  if [ -n "$stored_site_id" ]; then
+    ok "SHAREPOINT_SITE_ID already in azd env: $stored_site_id"
+    site_id="$stored_site_id"
+    library="${stored_library:-Shared Documents}"
+  else
+    local sp_host; sp_host=$(ask "SharePoint hostname" "gravitonlabs.sharepoint.com")
+    local sp_path; sp_path=$(ask "Site path (leave blank for root site)" "")
+
+    local graph_url
+    if [ -z "$sp_path" ]; then
+      graph_url="https://graph.microsoft.com/v1.0/sites/${sp_host}"
+    else
+      graph_url="https://graph.microsoft.com/v1.0/sites/${sp_host}:${sp_path}"
+    fi
+
+    info "Looking up site ID via Graph API..."
+    local site_id; site_id=$(az rest --method GET \
+      --url "$graph_url" \
+      --query id -o tsv 2>/dev/null || true)
+
+    if [ -z "$site_id" ]; then
+      err "Could not retrieve site ID. Check the hostname and path."
+      info "You can set it manually later:"
+      info "  azd env set SHAREPOINT_SITE_ID <id>"
+      info "  bash scripts/install.sh --from 6"
+      return
+    fi
+    ok "Site ID: $site_id"
+
+    local library; library=$(ask "Draft document library name" "Shared Documents")
+
+    azd env set SHAREPOINT_SITE_ID "$site_id"
+    azd env set SHAREPOINT_DRAFT_LIBRARY "$library"
+    ok "Saved to azd env"
   fi
-  ok "Site ID: $site_id"
-
-  local library; library=$(ask "Draft library name" "Generated Drafts")
 
   az containerapp update -n "$API_APP" -g "$RG" \
     --image "$image" \
