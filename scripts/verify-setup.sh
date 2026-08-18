@@ -59,10 +59,20 @@ hdr "Phase 2 · AZD Environment"
 
 RG=$(get_env AZURE_RESOURCE_GROUP)
 LOCATION=$(get_env AZURE_LOCATION)
+SUB_ID=$(get_env AZURE_SUBSCRIPTION_ID)
 OAI_ENDPOINT=$(get_env AZURE_OPENAI_ENDPOINT)
 SEARCH_ENDPOINT=$(get_env AZURE_SEARCH_ENDPOINT)
 APPINSIGHTS=$(get_env APPLICATIONINSIGHTS_CONNECTION_STRING)
 FOUNDRY_ENDPOINT=$(get_env AZURE_AI_FOUNDRY_PROJECT_ENDPOINT)
+
+if [ -n "$SUB_ID" ]; then
+  sub_name=$(az account show --subscription "$SUB_ID" --query name -o tsv 2>/dev/null || true)
+  ok "AZURE_SUBSCRIPTION_ID: $SUB_ID${sub_name:+ ($sub_name)}"
+else
+  active_sub=$(az account show --query "{id:id,name:name}" -o tsv 2>/dev/null | tr '\t' ' ' || true)
+  warn "AZURE_SUBSCRIPTION_ID not set — azd will use the active az account: $active_sub"
+  warn "  To pin it: az account set --subscription <id> && azd env set AZURE_SUBSCRIPTION_ID <id>"
+fi
 
 [ -n "$RG" ]               && ok "AZURE_RESOURCE_GROUP: $RG"           || err "AZURE_RESOURCE_GROUP not set — run: azd env new"
 [ -n "$LOCATION" ]         && ok "AZURE_LOCATION: $LOCATION"           || err "AZURE_LOCATION not set — run: azd env set AZURE_LOCATION eastus"

@@ -355,6 +355,7 @@ pytest -v
 
 | Variable | Source | Used by |
 |---|---|---|
+| `AZURE_SUBSCRIPTION_ID` | Selected subscription | azd provision target |
 | `AZURE_OPENAI_ENDPOINT` | OpenAI resource | API, ingestion, evaluation |
 | `AZURE_OPENAI_GPT_DEPLOYMENT` | `gpt-4o` | API, orchestrator |
 | `AZURE_OPENAI_MINI_DEPLOYMENT` | `gpt-4o-mini` | Evaluators, classification |

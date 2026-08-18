@@ -384,6 +384,24 @@ azd auth login</pre><button class="copy-btn">copy</button></div>
     </div>
 
     <div class="step">
+      <input type="checkbox" class="step-cb" id="p2-sub" data-phase="2">
+      <div class="step-body">
+        <div class="step-label">Select your Azure subscription</div>
+        <div class="step-desc">If you have more than one subscription, pick the right one now — both <code>az</code> and <code>azd</code> need to agree on it before provisioning.</div>
+        <div class="code-wrap"><pre># List all subscriptions — find the one you want to deploy to
+az account list --query "[].{name:name, id:id, state:state}" -o table
+
+# Set it (replace with your subscription ID or name)
+SUBSCRIPTION_ID="&lt;your-subscription-id&gt;"
+az account set --subscription "$SUBSCRIPTION_ID"
+azd env set AZURE_SUBSCRIPTION_ID "$SUBSCRIPTION_ID"
+
+# Confirm
+az account show --query "{name:name, id:id}" -o table</pre><button class="copy-btn">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
       <input type="checkbox" class="step-cb" id="p2-env" data-phase="2">
       <div class="step-body">
         <div class="step-label">Create environment and set required variables</div>
