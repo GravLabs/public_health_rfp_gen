@@ -351,6 +351,14 @@ phase_5() {
 
   step_hdr "Update manifest.json"
   info "Setting id and botId to $APP_ID ..."
+  local api_fqdn=""
+  if [ -n "${RG:-}" ]; then
+    local api_app
+    api_app=$(az containerapp list -g "$RG" \
+      --query "[?tags.\"azd-service-name\"=='api'].name | [0]" -o tsv 2>/dev/null || true)
+    [ -n "$api_app" ] && api_fqdn=$(az containerapp show -n "$api_app" -g "$RG" \
+      --query "properties.configuration.ingress.fqdn" -o tsv 2>/dev/null || true)
+  fi
   python3 - <<PYEOF
 import json, sys
 with open('teams-app/manifest.json') as f:
@@ -358,6 +366,9 @@ with open('teams-app/manifest.json') as f:
 d['id'] = '${APP_ID}'
 if d.get('bots'):
     d['bots'][0]['botId'] = '${APP_ID}'
+fqdn = '${api_fqdn}'
+if fqdn:
+    d['validDomains'] = [fqdn]
 with open('teams-app/manifest.json', 'w') as f:
     json.dump(d, f, indent=2)
     f.write('\n')

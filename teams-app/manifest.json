@@ -25,16 +25,24 @@
   "bots": [
     {
       "botId": "26b9c245-880d-458b-9edf-809c1a7f534a",
-      "scopes": ["personal", "team", "groupchat"],
+      "scopes": [
+        "personal",
+        "team",
+        "groupchat"
+      ],
       "supportsFiles": true,
       "isNotificationOnly": false,
       "commandLists": [
         {
-          "scopes": ["personal", "team", "groupchat"],
+          "scopes": [
+            "personal",
+            "team",
+            "groupchat"
+          ],
           "commands": [
             {
               "title": "Draft RFP",
-              "description": "Generate a new RFP draft — describe the program area, funding, and period"
+              "description": "Generate a new RFP draft \u2014 describe the program area, funding, and period"
             },
             {
               "title": "Help",
@@ -46,6 +54,6 @@
     }
   ],
   "validDomains": [
-    "ca-pubhealth-api-2gdlihbjsb5rk.wittysmoke-fc94257b.eastus.azurecontainerapps.io"
+    "ca-pubhealth-api-ies7lsbvjsdiw.nicesand-4c76bcb3.eastus.azurecontainerapps.io"
   ]
 }
