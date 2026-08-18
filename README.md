@@ -101,6 +101,18 @@ docker info   # must show server running
 
 ## Deploy to Azure
 
+### Guided install (recommended)
+
+```bash
+git clone https://github.com/GravLabs/public_health_rfp_gen.git
+cd public_health_rfp_gen
+bash scripts/install.sh
+```
+
+The installer walks through all six phases interactively — prerequisites, subscription selection, `azd up`, bot credentials, Teams app upload, and SharePoint access. Resume a failed run from any phase with `--from N` (e.g. `bash scripts/install.sh --from 4`).
+
+### Manual install
+
 ```bash
 git clone https://github.com/GravLabs/public_health_rfp_gen.git
 cd public_health_rfp_gen
@@ -108,6 +120,10 @@ cd public_health_rfp_gen
 # Authenticate
 az login
 azd auth login
+
+# Select subscription
+az account set --subscription "<subscription-id>"
+azd env set AZURE_SUBSCRIPTION_ID "<subscription-id>"
 
 # Create environment and set required variables
 azd env new pubhealth-rfp-poc
@@ -118,6 +134,8 @@ azd env set OWNER_EMAIL "your-email@example.com"
 # Deploy (provision + build containers + post-provision hook ~20 min)
 azd up
 ```
+
+See [docs/quickstart.html](docs/quickstart.html) for a step-by-step guide with copy-pasteable commands for all phases.
 
 `azd up` runs in three phases:
 
@@ -393,6 +411,8 @@ pytest -v
 │                            #   bot-service, monitoring, keyvault,
 │                            #   storage, doc-intelligence, budget, ...)
 ├── scripts/
+│   ├── install.sh           # Guided interactive installer (all 6 phases)
+│   ├── verify-setup.sh      # Post-install health check + smoke test
 │   ├── post-provision.sh    # azd post-provision hook (7 steps)
 │   ├── post-deploy.sh       # azd post-deploy hook (bot endpoint + password)
 │   └── load-env-vars.sh     # Load .env into azd environment
