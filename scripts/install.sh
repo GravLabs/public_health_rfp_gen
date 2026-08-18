@@ -189,34 +189,47 @@ phase_2() {
 phase_3() {
   phase_hdr "3/6" "AZD Environment & Deploy" "~25 min"
 
-  # Detect existing environment
-  local existing_rg; existing_rg=$(get_env AZURE_RESOURCE_GROUP)
+  step_hdr "AZD environment"
+  local env_name; env_name=$(ask "Environment name" "pubhealth-rfp-poc")
+
+  # Check if this named environment already exists and is deployed
+  local existing_rg=""
+  if azd env select "$env_name" &>/dev/null 2>&1; then
+    existing_rg=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null | tr -d '[:space:]' || true)
+  fi
+
   if [ -n "$existing_rg" ]; then
-    warn "AZD environment already configured."
+    warn "Environment '$env_name' is already deployed."
     info "Resource group: $existing_rg"
     echo ""
-    if ask_yn "Skip environment setup and run azd up anyway?"; then
+    if ask_yn "Skip setup and just re-run azd up?"; then
       RG="$existing_rg"
-      azd up
-      ok "Deployment complete."
+      if ! azd up; then
+        die "azd up failed — check the errors above, then re-run: bash scripts/install.sh --from 3"
+      fi
+      RG=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null | tr -d '[:space:]' || true)
+      ok "Deployment complete. Resource group: $RG"
       return
     fi
-    if ask_yn "Skip deployment entirely (already deployed)?"; then
+    if ask_yn "Skip deployment entirely (already fully deployed)?"; then
       RG="$existing_rg"
       return
     fi
   fi
 
-  step_hdr "Create AZD environment"
-  local env_name; env_name=$(ask "Environment name" "pubhealth-rfp-poc")
   local location; location=$(ask "Azure region" "eastus")
   local pub_email; pub_email=$(ask "Your email (for API Management publisher + budget alerts)")
 
-  azd env new "$env_name" 2>/dev/null || { info "Environment '$env_name' exists — selecting it."; azd env select "$env_name"; }
+  if ! azd env select "$env_name" &>/dev/null 2>&1; then
+    azd env new "$env_name"
+  fi
   azd env set AZURE_LOCATION "$location"
   azd env set APIM_PUBLISHER_EMAIL "$pub_email"
   azd env set OWNER_EMAIL "$pub_email"
-  ok "Environment '$env_name' ready."
+  # Apply subscription ID saved in phase_2 (was set before env existed — re-apply now)
+  local sub_id; sub_id=$(az account show --query id -o tsv 2>/dev/null || true)
+  [ -n "$sub_id" ] && azd env set AZURE_SUBSCRIPTION_ID "$sub_id"
+  ok "Environment '$env_name' configured."
 
   step_hdr "Deploy to Azure"
   echo ""
@@ -227,8 +240,11 @@ phase_3() {
   echo ""
 
   if ask_yn "Start deployment now?"; then
-    azd up
-    RG=$(get_env AZURE_RESOURCE_GROUP)
+    if ! azd up; then
+      die "azd up failed — check the errors above, then re-run: bash scripts/install.sh --from 3"
+    fi
+    RG=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null | tr -d '[:space:]' || true)
+    [ -z "$RG" ] && die "AZURE_RESOURCE_GROUP not set after azd up — provision may have partially failed."
     ok "Deployment complete. Resource group: $RG"
   else
     echo ""

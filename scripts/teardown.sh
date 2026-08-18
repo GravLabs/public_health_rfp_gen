@@ -44,11 +44,11 @@ fi
 
 echo ""
 echo "[3/3] Clearing local AZD environment state..."
-if [ -n "$ENV_NAME" ] && [ -d ".azure/$ENV_NAME" ]; then
-  read -r -p "Delete local .azure/$ENV_NAME directory? (yes/no): " del_local
+if [ -d ".azure" ]; then
+  read -r -p "Delete entire .azure/ directory (removes all local env state)? (yes/no): " del_local
   if [ "$del_local" = "yes" ]; then
-    rm -rf ".azure/$ENV_NAME"
-    echo "      Removed .azure/$ENV_NAME"
+    rm -rf ".azure"
+    echo "      Removed .azure/"
   fi
 fi
 
