@@ -185,6 +185,17 @@ cd tests && pip install -r requirements-test.txt && pytest -v
 
 ---
 
+## POC Limitations
+
+Two known limitations are accepted for this POC and documented here for production planning:
+
+| Limitation | Impact | Production fix |
+|---|---|---|
+| **Draft cache is in-memory** | If the API container restarts between generation and the user clicking "Approve", the draft is lost and the user sees a 404. | Replace `_draft_cache` in `src/api/main.py` with a Redis cache or Cosmos DB item with a short TTL. |
+| **APIM Consumption SKU** | Token-per-minute limiting, semantic caching, and token metric emission require APIM Standard v2. The Consumption tier used here has none of these. | Upgrade to Standard v2 (~$140/mo) and restore the full policy XML from git history. |
+
+---
+
 ## Adapting for Your Organization
 
 1. **Replace the corpus** — swap `data/sample-rfps/` with your RFP documents and re-run ingestion
