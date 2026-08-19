@@ -300,8 +300,13 @@ phase_3() {
     fi
   fi
 
-  local location; location=$(ask "Azure region" "eastus")
-  local pub_email; pub_email=$(ask "Your email (for API Management publisher + budget alerts)")
+  local location_default; location_default=$(get_env AZURE_LOCATION)
+  [ -z "$location_default" ] && location_default="eastus"
+  local location; location=$(ask "Azure region" "$location_default")
+  local email_default; email_default=$(get_env APIM_PUBLISHER_EMAIL)
+  [ -z "$email_default" ] && email_default=$(get_env OWNER_EMAIL)
+  local pub_email; pub_email=$(ask "Your email (for API Management publisher + budget alerts)" "$email_default")
+  [ -z "$pub_email" ] && die "An email address is required for the API Management publisher."
 
   if ! azd env select "$env_name" &>/dev/null 2>&1; then
     azd env new "$env_name"

@@ -156,6 +156,9 @@ resource opChatCompletions 'Microsoft.ApiManagement/service/apis/operations@2023
 resource apiPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview' = {
   parent: api
   name: 'policy'
+  dependsOn: [
+    backendBase
+  ]
   properties: {
     format: 'rawxml'
     value: '''
