@@ -18,6 +18,8 @@ hdr()  { printf "\n${BOLD}${CYAN}── %s ──${NC}\n" "$1"; }
 
 get_env() { local v; v=$(azd env get-value "$1" 2>/dev/null) && echo "$v" || true; }
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib-bot-identity.sh"
+
 semver_ok() {
   local ver="$1" min="$2"
   local ma mi rma rmi
@@ -175,6 +177,31 @@ else
     [[ "${BOT_ENDPOINT:-}" == https://* ]] \
       && ok "Bot Service endpoint: $BOT_ENDPOINT" \
       || err "Bot Service endpoint missing — run: az bot update -g $RG -n $BOT_NAME --endpoint https://<fqdn>/api/messages"
+
+    # IDs matching across container/manifest/Bot Service only proves they were
+    # once consistent — not that the underlying Entra ID identity still
+    # exists. It can be deleted out-of-band with zero trace in any of those
+    # configs, so check Entra ID directly, then prove delivery with a live
+    # message instead of trusting config alone.
+    if [ -n "${MANIFEST_BOT_ID:-}" ]; then
+      if az ad app show --id "$MANIFEST_BOT_ID" &>/dev/null; then
+        ok "Entra ID App Registration exists: $MANIFEST_BOT_ID"
+      else
+        err "Entra ID App Registration MISSING for $MANIFEST_BOT_ID — bot will receive zero messages, silently. Run: bash scripts/install.sh --from 2"
+      fi
+      if az ad sp show --id "$MANIFEST_BOT_ID" &>/dev/null; then
+        ok "Entra ID Service Principal exists: $MANIFEST_BOT_ID"
+      else
+        err "Entra ID Service Principal MISSING for $MANIFEST_BOT_ID — bot will receive zero messages, silently. Run: bash scripts/install.sh --from 2"
+      fi
+    fi
+
+    info "Sending a live test message via Direct Line (bypasses Teams entirely)..."
+    if bot_identity_roundtrip_test "$RG" "$BOT_NAME"; then
+      ok "Bot responded to a live test message — identity chain confirmed working end to end"
+    else
+      err "Bot did NOT respond to a live test message — Teams will not work either. Check: az containerapp logs show -n <api-app> -g $RG --tail 100"
+    fi
   else
     err "No Bot Service found in $RG"
   fi

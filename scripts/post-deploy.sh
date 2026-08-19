@@ -5,6 +5,8 @@ set -e
 
 echo "=== Post-deploy: updating Bot Service endpoint ==="
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib-bot-identity.sh"
+
 RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || echo "")
 BOT_NAME=$(azd env get-value AZURE_BOT_NAME 2>/dev/null || echo "")
 CLIENT_ID=$(azd env get-value AZURE_CLIENT_ID 2>/dev/null || echo "")
@@ -52,6 +54,27 @@ fi
 
 # Persist the messaging endpoint for reference
 azd env set BOT_MESSAGING_ENDPOINT "$MESSAGING_ENDPOINT"
+
+echo ""
+echo "=== Verifying bot identity end to end ==="
+BOT_APP_ID_CHECK=$(azd env get-value BOT_APP_ID 2>/dev/null || echo "")
+if [ -n "$BOT_APP_ID_CHECK" ]; then
+  if bot_identity_ensure "$BOT_APP_ID_CHECK"; then
+    echo "  Sending a live test message via Direct Line (bypasses Teams entirely)..."
+    if bot_identity_roundtrip_test "$RESOURCE_GROUP" "$BOT_NAME"; then
+      echo "  ✓ Bot responded to a live test message — identity chain confirmed working."
+    else
+      echo "  ✗✗ Bot did NOT respond to a live test message."
+      echo "     Teams will not work either — this is the same delivery path."
+      echo "     Check container logs: az containerapp logs show -n $API_APP_NAME -g $RESOURCE_GROUP --tail 100"
+    fi
+  else
+    echo "  ✗✗ Bot identity is broken — see errors above. Teams will not receive messages."
+    echo "     Fix with: bash scripts/install.sh --from 2"
+  fi
+else
+  echo "  · BOT_APP_ID not set — skipping identity check"
+fi
 
 echo ""
 echo "=== Post-deploy complete ==="

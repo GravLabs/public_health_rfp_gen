@@ -21,6 +21,12 @@ services:
     host: containerapp
 
 hooks:
+  preprovision:
+    posix:
+      shell: sh
+      run: scripts/pre-provision.sh
+      interactive: true
+      continueOnError: false
   postdeploy:
     posix:
       shell: sh

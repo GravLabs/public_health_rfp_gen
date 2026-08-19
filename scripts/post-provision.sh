@@ -3,6 +3,8 @@ set -e
 
 echo "=== Post-provision: Public Health RFP POC ==="
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib-bot-identity.sh"
+
 # ── Resolve AZD environment variables ────────────────────────────────────────
 ACCOUNT=$(azd env get-value AZURE_STORAGE_ACCOUNT)
 SEARCH_ENDPOINT=$(azd env get-value AZURE_SEARCH_ENDPOINT)
@@ -11,7 +13,7 @@ APPINSIGHTS_CONN=$(azd env get-value APPLICATIONINSIGHTS_CONNECTION_STRING)
 CONTAINER="rfp-corpus"
 
 echo ""
-echo "[1/6] Uploading sample RFPs to blob storage: ${ACCOUNT}/${CONTAINER}"
+echo "[1/7] Uploading sample RFPs to blob storage: ${ACCOUNT}/${CONTAINER}"
 if [ -d "data/sample-rfps" ]; then
   az storage blob upload-batch \
     --account-name "$ACCOUNT" \
@@ -25,7 +27,7 @@ else
   echo "      ⚠ data/sample-rfps not found — skipping (add .md files there to populate)"
 fi
 
-echo "[2/6] Uploading eval examples to golden-dataset container"
+echo "[2/7] Uploading eval examples to golden-dataset container"
 if [ -d "data/eval-examples" ]; then
   az storage blob upload-batch \
     --account-name "$ACCOUNT" \
@@ -39,7 +41,7 @@ else
   echo "      ⚠ data/eval-examples not found — skipping (add .json files there to populate)"
 fi
 
-echo "[3/6] Creating AI Search index and running ingestion pipeline"
+echo "[3/7] Creating AI Search index and running ingestion pipeline"
 if [ -f "src/ingestion/create_index.py" ]; then
   export AZURE_SEARCH_ENDPOINT="$SEARCH_ENDPOINT"
   export AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT"
@@ -73,7 +75,7 @@ else
   echo "      ⚠ src/ingestion/create_index.py not found — skipping ingestion"
 fi
 
-echo "[4/6] Setting up AI Foundry connections"
+echo "[4/7] Setting up AI Foundry connections"
 # Hub/project names and endpoint come straight from Bicep outputs (azd env set by provision) —
 # always match the current resourceToken, no stale fallback needed.
 FOUNDRY_ENDPOINT=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_ENDPOINT)
@@ -81,7 +83,7 @@ FOUNDRY_PROJECT_NAME=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_NAME)
 FOUNDRY_HUB=$(azd env get-value AZURE_AI_FOUNDRY_HUB_NAME)
 echo "      ✓ AI Foundry vars: $FOUNDRY_PROJECT_NAME @ $FOUNDRY_ENDPOINT"
 
-echo "[5/6] Fabric setup"
+echo "[5/7] Fabric setup"
 FABRIC_WORKSPACE=$(azd env get-value FABRIC_WORKSPACE_ID 2>/dev/null) || FABRIC_WORKSPACE=""
 if [ -n "$FABRIC_WORKSPACE" ]; then
   echo "      Fabric workspace already provisioned: $FABRIC_WORKSPACE"
@@ -94,7 +96,20 @@ else
   echo "          --sharepoint-site-id <YOUR_SITE_ID>"
 fi
 
-echo "[6/6] Writing .env file from AZD environment"
+echo "[6/7] Verifying Teams bot identity (App Registration + Service Principal)"
+BOT_APP_ID_CHECK=$(azd env get-value BOT_APP_ID 2>/dev/null || echo "")
+if [ -n "$BOT_APP_ID_CHECK" ]; then
+  if bot_identity_ensure "$BOT_APP_ID_CHECK"; then
+    echo "      ✓ Bot App Registration + Service Principal confirmed"
+  else
+    echo "      ✗ Bot identity is broken — Teams bot will not receive messages."
+    echo "        Fix with: bash scripts/install.sh --from 2"
+  fi
+else
+  echo "      · BOT_APP_ID not set yet — nothing to verify (run Phase 2 of install.sh)"
+fi
+
+echo "[7/7] Writing .env file from AZD environment"
 cat > .env << EOF
 AZURE_SEARCH_ENDPOINT=${SEARCH_ENDPOINT}
 AZURE_OPENAI_ENDPOINT=${OPENAI_ENDPOINT}

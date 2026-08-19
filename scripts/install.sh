@@ -20,6 +20,8 @@ err()  { printf "  ${RED}✗${NC}  %s\n" "$1"; }
 warn() { printf "  ${AMB}⚠${NC}  %s\n" "$1"; }
 info() { printf "  ${DIM}·${NC}  %s\n" "$1"; }
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib-bot-identity.sh"
+
 phase_hdr() {
   local num="$1" title="$2" time="${3:-}"
   printf "\n${BLD}${CYN}"
@@ -229,10 +231,23 @@ ensure_bot_app_registration() {
   local existing_secret; existing_secret=$(get_env BOT_APP_SECRET)
 
   if [ -n "$existing_app_id" ] && [ -n "$existing_secret" ]; then
-    ok "Bot App Registration already configured: $existing_app_id"
-    APP_ID="$existing_app_id"
-    APP_PASSWORD="$existing_secret"
-    return
+    # A cached ID in azd env only proves we created it once — not that it
+    # still exists in Entra ID. It can be deleted out-of-band (accidental
+    # `az ad app delete`, tenant cleanup) with zero trace in azd env, so
+    # verify (and self-heal via soft-delete restore + SP creation) before
+    # trusting it. See lib-bot-identity.sh for the full story.
+    info "Verifying cached App Registration $existing_app_id is still valid..."
+    if bot_identity_ensure "$existing_app_id"; then
+      ok "Bot App Registration already configured: $existing_app_id"
+      APP_ID="$existing_app_id"
+      APP_PASSWORD="$existing_secret"
+      return
+    fi
+    warn "Cached App Registration is unrecoverable — creating a new one."
+    azd env set BOT_APP_ID "" 2>/dev/null || true
+    azd env set BOT_APP_SECRET "" 2>/dev/null || true
+    existing_app_id=""
+    existing_secret=""
   fi
 
   step_hdr "Teams Bot App Registration"
@@ -261,6 +276,12 @@ ensure_bot_app_registration() {
     [ -z "$APP_PASSWORD" ] && die "Failed to create client secret."
     ok "Secret created."
   fi
+
+  # `az ad app create` does NOT create the linked Service Principal — Bot
+  # Connector needs both. Ensure it exists regardless of which branch above
+  # produced APP_ID (freshly created, manually reused, or secret re-entered).
+  info "Ensuring Service Principal exists for $APP_ID..."
+  bot_identity_ensure "$APP_ID" || die "Bot identity could not be established for $APP_ID — see errors above."
 
   azd env set BOT_APP_ID "$APP_ID"
   azd env set BOT_APP_SECRET "$APP_PASSWORD"
@@ -371,6 +392,20 @@ phase_4() {
     --endpoint "https://${fqdn}/api/messages" \
     --output none
   ok "Bot endpoint: https://${fqdn}/api/messages"
+
+  step_hdr "Verifying bot identity end to end"
+  if bot_identity_ensure "$APP_ID"; then
+    info "Sending a live test message via Direct Line (bypasses Teams entirely)..."
+    if bot_identity_roundtrip_test "$RG" "$bot_name"; then
+      ok "Bot responded to a live test message — identity chain confirmed working."
+    else
+      err "Bot did NOT respond to a live test message."
+      warn "Do not assume Teams will work — this is the same failure mode Teams would hit."
+      warn "Check container logs: az containerapp logs show -n $API_APP -g $RG --tail 100"
+    fi
+  else
+    err "Bot identity is broken — installing the Teams app now would not work."
+  fi
 }
 
 # ── Phase 5: Teams App Install ────────────────────────────────────────────────
