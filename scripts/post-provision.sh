@@ -82,7 +82,7 @@ FOUNDRY_HUB=$(azd env get-value AZURE_AI_FOUNDRY_HUB_NAME)
 echo "      ✓ AI Foundry vars: $FOUNDRY_PROJECT_NAME @ $FOUNDRY_ENDPOINT"
 
 echo "[5/6] Fabric setup"
-FABRIC_WORKSPACE=$(azd env get-value FABRIC_WORKSPACE_ID 2>/dev/null || echo "")
+FABRIC_WORKSPACE=$(azd env get-value FABRIC_WORKSPACE_ID 2>/dev/null) || FABRIC_WORKSPACE=""
 if [ -n "$FABRIC_WORKSPACE" ]; then
   echo "      Fabric workspace already provisioned: $FABRIC_WORKSPACE"
 else
