@@ -162,6 +162,42 @@ class SharePointClient:
             resp.raise_for_status()
         return resp.json()["id"]
 
+    async def ensure_review_list(self, site_list_name: str = "RFP Review Tracking") -> None:
+        """Create the review-tracking list if it doesn't exist yet on the site.
+
+        Uses the managed identity's app-only Sites.ReadWrite.All — this can create
+        lists tenant-wide regardless of the deploying user's own SharePoint
+        permission level on the site (list creation needs Design/Full Control,
+        which a delegated install-time login may not have).
+        """
+        async with httpx.AsyncClient(timeout=30) as client:
+            check = await client.get(
+                f"{GRAPH_BASE}/sites/{self._site_id}/lists/{site_list_name}",
+                headers=self._headers(),
+            )
+            if check.status_code == 200:
+                return
+
+            payload = {
+                "displayName": site_list_name,
+                "list": {"template": "genericList"},
+                "columns": [
+                    {"name": "DraftId", "text": {}},
+                    {"name": "GateDecision", "text": {}},
+                    {"name": "CompletenessScore", "number": {"decimalPlaces": "automatic"}},
+                    {"name": "GroundednessScore", "number": {"decimalPlaces": "automatic"}},
+                    {"name": "SharePointUrl", "text": {}},
+                    {"name": "Status", "text": {}},
+                ],
+            }
+            resp = await client.post(
+                f"{GRAPH_BASE}/sites/{self._site_id}/lists",
+                headers=self._headers(),
+                json=payload,
+            )
+            resp.raise_for_status()
+            log.info("Created SharePoint review-tracking list: %s", site_list_name)
+
     # ── Utility ───────────────────────────────────────────────────────────────
 
     @staticmethod
