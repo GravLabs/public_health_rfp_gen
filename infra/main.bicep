@@ -13,7 +13,8 @@ param openAiModelVersion string = '2024-08-06'
 param embeddingModelName string = 'text-embedding-3-small'
 param searchSkuName string = 'basic'
 param budgetAmountUsd int = 500
-param botAppId string = '26b9c245-880d-458b-9edf-809c1a7f534a'
+@description('Client ID of the Azure AD App Registration for the Teams bot — must exist before deploy (msaAppType is SingleTenant, validated at provision time)')
+param botAppId string
 @secure()
 param botAppSecret string = ''
 param tags object = {}
@@ -24,7 +25,7 @@ var prefix = '${abbrs.resourcesResourceGroups}${environmentName}'
 
 // Resource Group
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
-  name: '${prefix}-pubhealth-rfp-${resourceToken}'
+  name: '${prefix}-${resourceToken}'
   location: location
   tags: tags
 }
@@ -247,6 +248,8 @@ output AZURE_APIM_GATEWAY_URL string = apim.outputs.gatewayUrl
 output AZURE_APIM_NAME string = apim.outputs.apimName
 
 output AZURE_AI_FOUNDRY_PROJECT_ENDPOINT string = aiFoundry.outputs.projectEndpoint
+output AZURE_AI_FOUNDRY_HUB_NAME string = '${abbrs.machineLearningWorkspaces}pubhealth-hub-${resourceToken}'
+output AZURE_AI_FOUNDRY_PROJECT_NAME string = '${abbrs.machineLearningWorkspaces}pubhealth-rfp-${resourceToken}'
 
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerApps.outputs.registryLoginServer
 

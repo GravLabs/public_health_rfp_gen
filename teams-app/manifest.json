@@ -2,12 +2,12 @@
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
   "manifestVersion": "1.16",
   "version": "1.0.1",
-  "id": "26b9c245-880d-458b-9edf-809c1a7f534a",
+  "id": "40c6de5a-1c39-4404-8eb6-0863ef9c54e8",
   "developer": {
     "name": "Graviton Labs",
     "websiteUrl": "https://www.graviton-labs.com",
-    "privacyUrl": "https://www.graviton-labs.com/privacy",
-    "termsOfUseUrl": "https://www.graviton-labs.com/terms"
+    "privacyUrl": "https://www.graviton-labs.com",
+    "termsOfUseUrl": "https://www.graviton-labs.com"
   },
   "icons": {
     "color": "color.png",
@@ -24,7 +24,7 @@
   "accentColor": "#0369A1",
   "bots": [
     {
-      "botId": "26b9c245-880d-458b-9edf-809c1a7f534a",
+      "botId": "40c6de5a-1c39-4404-8eb6-0863ef9c54e8",
       "scopes": [
         "personal",
         "team",
@@ -54,6 +54,6 @@
     }
   ],
   "validDomains": [
-    "ca-pubhealth-api-ies7lsbvjsdiw.nicesand-4c76bcb3.eastus.azurecontainerapps.io"
+    "ca-pubhealth-api-ies7lsbvjsdiw.orangecliff-d2f1089e.eastus.azurecontainerapps.io"
   ]
 }

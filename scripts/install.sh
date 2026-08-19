@@ -74,6 +74,29 @@ die() { err "$1"; exit 1; }
 
 get_env() { local v; v=$(azd env get-value "$1" 2>/dev/null) && echo "$v" || true; }
 
+# login_with_fallback <label> <cmd...> — runs the login command; if it fails
+# because no browser can be launched (headless/SSH), retries with device code.
+login_with_fallback() {
+  local label="$1"; shift
+  if [ -n "${login_flags:-}" ]; then
+    "$@" $login_flags
+    return $?
+  fi
+  local logf; logf=$(mktemp)
+  if "$@" 2>&1 | tee "$logf"; then
+    rm -f "$logf"
+    return 0
+  fi
+  if grep -qiE "DISPLAY|xdg-open|no browser|browser" "$logf"; then
+    rm -f "$logf"
+    warn "$label couldn't open a browser — falling back to device code login."
+    "$@" --use-device-code
+    return $?
+  fi
+  rm -f "$logf"
+  return 1
+}
+
 # Global state (set across phases)
 APP_ID=""
 APP_PASSWORD=""
@@ -143,22 +166,35 @@ phase_1() {
 phase_2() {
   phase_hdr "2/6" "Authenticate & Select Subscription" "~2 min"
 
+  local login_flags=""
+  if [ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ] || \
+     { [ "$(uname)" = "Linux" ] && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; }; then
+    info "Headless/SSH session detected — using device code login."
+    login_flags="--use-device-code"
+  fi
+
   step_hdr "Azure CLI login"
   if az account show &>/dev/null 2>&1; then
     local current_name; current_name=$(az account show --query name -o tsv 2>/dev/null || echo "unknown")
     ok "Already logged in as: $current_name"
     if ! ask_yn "Use this account?"; then
-      az login --output none
+      login_with_fallback "az login" az login || die "az login failed."
     fi
   else
-    info "Opening browser for az login..."
-    az login --output none
+    info "Logging in via az login..."
+    login_with_fallback "az login" az login || die "az login failed."
   fi
+  az account show &>/dev/null 2>&1 || die "az CLI still not authenticated after login."
   ok "Azure CLI authenticated"
 
   step_hdr "Azure Developer CLI login"
-  info "Opening browser for azd auth login..."
-  azd auth login --output none
+  if azd auth login --check-status &>/dev/null 2>&1; then
+    ok "azd already authenticated"
+  else
+    info "Logging in via azd auth login..."
+    login_with_fallback "azd auth login" azd auth login || die "azd auth login failed."
+    azd auth login --check-status &>/dev/null 2>&1 || die "azd still not authenticated after login."
+  fi
   ok "azd authenticated"
 
   step_hdr "Subscription"
@@ -185,9 +221,55 @@ phase_2() {
   ok "AZURE_SUBSCRIPTION_ID: $sub_id"
 }
 
+# Bot App Registration must exist before `azd up` — Bot Service is msaAppType
+# SingleTenant, which Azure validates against the tenant at provision time.
+# Sets globals APP_ID / APP_PASSWORD and persists both to azd env.
+ensure_bot_app_registration() {
+  local existing_app_id; existing_app_id=$(get_env BOT_APP_ID)
+  local existing_secret; existing_secret=$(get_env BOT_APP_SECRET)
+
+  if [ -n "$existing_app_id" ] && [ -n "$existing_secret" ]; then
+    ok "Bot App Registration already configured: $existing_app_id"
+    APP_ID="$existing_app_id"
+    APP_PASSWORD="$existing_secret"
+    return
+  fi
+
+  step_hdr "Teams Bot App Registration"
+  echo ""
+  if [ -n "$existing_app_id" ]; then
+    warn "BOT_APP_ID found ($existing_app_id) but BOT_APP_SECRET is missing."
+    APP_ID="$existing_app_id"
+    APP_PASSWORD=$(ask "Client secret for App Registration $APP_ID")
+  elif ask_yn "Do you have an existing App Registration to reuse?" "n"; then
+    APP_ID=$(ask "App Registration ID (appId)")
+    APP_PASSWORD=$(ask "Client secret (password)")
+  else
+    local app_name; app_name=$(ask "App Registration display name" "pubhealth-rfp-bot")
+    info "Creating App Registration '$app_name'..."
+    APP_ID=$(az ad app create \
+      --display-name "$app_name" \
+      --sign-in-audience AzureADMyOrg \
+      --query appId -o tsv 2>/dev/null)
+    [ -z "$APP_ID" ] && die "Failed to create App Registration."
+    ok "Created: $APP_ID"
+
+    info "Creating client secret (2-year expiry)..."
+    APP_PASSWORD=$(az ad app credential reset \
+      --id "$APP_ID" --years 2 \
+      --query password -o tsv 2>/dev/null)
+    [ -z "$APP_PASSWORD" ] && die "Failed to create client secret."
+    ok "Secret created."
+  fi
+
+  azd env set BOT_APP_ID "$APP_ID"
+  azd env set BOT_APP_SECRET "$APP_PASSWORD"
+  ok "BOT_APP_ID and BOT_APP_SECRET saved to azd env."
+}
+
 # ── Phase 3: AZD Environment & Deploy ────────────────────────────────────────
 phase_3() {
-  phase_hdr "3/6" "AZD Environment & Deploy" "~25 min"
+  phase_hdr "3/6" "AZD Environment, Bot Registration & Deploy" "~25 min"
 
   step_hdr "AZD environment"
   local env_name; env_name=$(ask "Environment name" "pubhealth-rfp-poc")
@@ -195,7 +277,7 @@ phase_3() {
   # Check if this named environment already exists and is deployed
   local existing_rg=""
   if azd env select "$env_name" &>/dev/null 2>&1; then
-    existing_rg=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null | tr -d '[:space:]' || true)
+    existing_rg=$(get_env AZURE_RESOURCE_GROUP)
   fi
 
   if [ -n "$existing_rg" ]; then
@@ -204,10 +286,11 @@ phase_3() {
     echo ""
     if ask_yn "Skip setup and just re-run azd up?"; then
       RG="$existing_rg"
+      ensure_bot_app_registration
       if ! azd up; then
         die "azd up failed — check the errors above, then re-run: bash scripts/install.sh --from 3"
       fi
-      RG=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null | tr -d '[:space:]' || true)
+      RG=$(get_env AZURE_RESOURCE_GROUP)
       ok "Deployment complete. Resource group: $RG"
       return
     fi
@@ -231,6 +314,8 @@ phase_3() {
   [ -n "$sub_id" ] && azd env set AZURE_SUBSCRIPTION_ID "$sub_id"
   ok "Environment '$env_name' configured."
 
+  ensure_bot_app_registration
+
   step_hdr "Deploy to Azure"
   echo ""
   info "azd up provisions ~20 resources and takes approximately 20 minutes."
@@ -243,7 +328,7 @@ phase_3() {
     if ! azd up; then
       die "azd up failed — check the errors above, then re-run: bash scripts/install.sh --from 3"
     fi
-    RG=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null | tr -d '[:space:]' || true)
+    RG=$(get_env AZURE_RESOURCE_GROUP)
     [ -z "$RG" ] && die "AZURE_RESOURCE_GROUP not set after azd up — provision may have partially failed."
     ok "Deployment complete. Resource group: $RG"
   else
@@ -253,9 +338,9 @@ phase_3() {
   fi
 }
 
-# ── Phase 4: Teams Bot Setup ──────────────────────────────────────────────────
+# ── Phase 4: Teams Bot Endpoint ────────────────────────────────────────────────
 phase_4() {
-  phase_hdr "4/6" "Teams Bot Setup" "~10 min"
+  phase_hdr "4/6" "Teams Bot Endpoint" "~2 min"
 
   RG=$(get_env AZURE_RESOURCE_GROUP)
   [ -z "$RG" ] && die "AZURE_RESOURCE_GROUP not set — complete Phase 3 first."
@@ -264,66 +349,9 @@ phase_4() {
     --query "[?tags.\"azd-service-name\"=='api'].name | [0]" -o tsv 2>/dev/null || true)
   [ -z "$API_APP" ] || [ "$API_APP" = "null" ] && die "API Container App not found in $RG."
 
-  # Detect existing bot credentials
-  local existing_id; existing_id=$(az containerapp show -n "$API_APP" -g "$RG" \
-    --query "properties.template.containers[0].env[?name=='MICROSOFT_APP_ID'].value | [0]" \
-    -o tsv 2>/dev/null || true)
-
-  if [ -n "$existing_id" ] && [ "$existing_id" != "null" ]; then
-    ok "Bot App ID already set on container: $existing_id"
-    APP_ID="$existing_id"
-    # Check if the secret is already stored in azd env
-    local stored_secret; stored_secret=$(get_env BOT_APP_SECRET)
-    if [ -n "$stored_secret" ]; then
-      ok "BOT_APP_SECRET found in azd env — re-applying to container."
-      APP_PASSWORD="$stored_secret"
-    else
-      warn "BOT_APP_SECRET not in azd env — need to (re-)enter the client secret."
-      APP_PASSWORD=$(ask "Client secret for App Registration $APP_ID")
-      azd env set BOT_APP_SECRET "$APP_PASSWORD"
-      ok "BOT_APP_SECRET saved to AZD env"
-    fi
-  else
-    step_hdr "App Registration"
-    echo ""
-    if ask_yn "Do you have an existing App Registration to reuse?" "n"; then
-      APP_ID=$(ask "App Registration ID (appId)")
-      APP_PASSWORD=$(ask "Client secret (password)")
-    else
-      local app_name; app_name=$(ask "App Registration display name" "pubhealth-rfp-bot")
-      info "Creating App Registration '$app_name'..."
-      APP_ID=$(az ad app create \
-        --display-name "$app_name" \
-        --sign-in-audience AzureADMyOrg \
-        --query appId -o tsv 2>/dev/null)
-      [ -z "$APP_ID" ] && die "Failed to create App Registration."
-      ok "Created: $APP_ID"
-
-      info "Creating client secret (2-year expiry)..."
-      APP_PASSWORD=$(az ad app credential reset \
-        --id "$APP_ID" --years 2 \
-        --query password -o tsv 2>/dev/null)
-      [ -z "$APP_PASSWORD" ] && die "Failed to create client secret."
-      ok "Secret created."
-    fi
-
-    step_hdr "Apply credentials"
-    azd env set BOT_APP_SECRET "$APP_PASSWORD"
-    ok "BOT_APP_SECRET saved to AZD env"
-  fi
-
-  local image; image=$(az containerapp show -n "$API_APP" -g "$RG" \
-    --query "properties.template.containers[0].image" -o tsv 2>/dev/null)
-
-  info "Updating API container (creates new revision)..."
-  az containerapp update -n "$API_APP" -g "$RG" \
-    --image "$image" \
-    --set-env-vars \
-      "MICROSOFT_APP_ID=${APP_ID}" \
-      "MICROSOFT_APP_PASSWORD=${APP_PASSWORD}" \
-    --revision-suffix "botinit$(date +%s)" \
-    --output none
-  ok "Container updated with bot credentials."
+  APP_ID=$(get_env BOT_APP_ID)
+  [ -z "$APP_ID" ] && die "BOT_APP_ID not set — complete Phase 3 first (App Registration must exist before deploy)."
+  ok "Bot App ID: $APP_ID"
 
   step_hdr "Bot Service endpoint"
   local bot_name; bot_name=$(az resource list -g "$RG" \
