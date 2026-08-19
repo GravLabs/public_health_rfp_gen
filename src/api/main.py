@@ -76,10 +76,6 @@ async def lifespan(app: FastAPI):
     if SHAREPOINT_SITE_ID:
         _sp_client = SharePointClient(SHAREPOINT_SITE_ID, credential)
         log.info("SharePoint client initialized for site: %s", SHAREPOINT_SITE_ID)
-        try:
-            await _sp_client.ensure_review_list()
-        except Exception:
-            log.exception("Failed to ensure SharePoint review-tracking list exists")
     if FABRIC_WORKSPACE_ID and FABRIC_LAKEHOUSE_ID:
         _fabric_client = FabricClient(FABRIC_WORKSPACE_ID, FABRIC_LAKEHOUSE_ID, credential)
         log.info("Fabric client initialized for workspace: %s", FABRIC_WORKSPACE_ID)
@@ -163,21 +159,6 @@ async def _persist_draft(draft: RfpDraft, request: RfpRequest, evaluation: Evalu
         sp_url = await _sp_client.upload_draft_docx(
             SHAREPOINT_DRAFT_LIBRARY, draft.rfp_id, draft.draft_id, draft.sections
         )
-        try:
-            await _sp_client.create_review_item("RFP Review Tracking", {
-                "Title": draft.rfp_id,
-                "DraftId": draft.draft_id,
-                "GateDecision": evaluation.gate_decision.value,
-                "CompletenessScore": evaluation.scores.completeness,
-                "GroundednessScore": evaluation.scores.groundedness,
-                "SharePointUrl": sp_url,
-                "Status": "Pending Review"
-            })
-        except Exception:
-            # Tracking-list entry is secondary metadata — the draft is already
-            # uploaded at this point, so don't fail the whole request over it
-            # (e.g. the "RFP Review Tracking" list not existing on the site yet).
-            log.exception("Failed to create SharePoint review-tracking item for draft %s", draft.draft_id)
 
     if request.write_to_fabric and _fabric_client:
         md_content = SharePointClient.draft_to_markdown(draft.rfp_id, draft.sections)
