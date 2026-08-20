@@ -40,7 +40,7 @@ APPINSIGHTS_CONN=$(azd env get-value APPLICATIONINSIGHTS_CONNECTION_STRING)
 CONTAINER="rfp-corpus"
 
 echo ""
-echo "[1/7] Uploading sample RFPs to blob storage: ${ACCOUNT}/${CONTAINER}"
+echo "[1/8] Uploading sample RFPs to blob storage: ${ACCOUNT}/${CONTAINER}"
 if [ -d "data/sample-rfps" ]; then
   if wait_for_container "$ACCOUNT" "$CONTAINER"; then
     az storage blob upload-batch \
@@ -58,7 +58,7 @@ else
   echo "      ⚠ data/sample-rfps not found — skipping (add .md files there to populate)"
 fi
 
-echo "[2/7] Uploading eval examples to golden-dataset container"
+echo "[2/8] Uploading eval examples to golden-dataset container"
 if [ -d "data/eval-examples" ]; then
   if wait_for_container "$ACCOUNT" "golden-dataset"; then
     az storage blob upload-batch \
@@ -76,7 +76,7 @@ else
   echo "      ⚠ data/eval-examples not found — skipping (add .json files there to populate)"
 fi
 
-echo "[3/7] Creating AI Search index and running ingestion pipeline"
+echo "[3/8] Creating AI Search index and running ingestion pipeline"
 if [ -f "src/ingestion/create_index.py" ]; then
   export AZURE_SEARCH_ENDPOINT="$SEARCH_ENDPOINT"
   export AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT"
@@ -122,7 +122,7 @@ else
   echo "      ⚠ src/ingestion/create_index.py not found — skipping ingestion"
 fi
 
-echo "[4/7] Setting up AI Foundry connections"
+echo "[4/8] Setting up AI Foundry connections"
 # Hub/project names and endpoint come straight from Bicep outputs (azd env set by provision) —
 # always match the current resourceToken, no stale fallback needed.
 FOUNDRY_ENDPOINT=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_ENDPOINT)
@@ -130,7 +130,7 @@ FOUNDRY_PROJECT_NAME=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_NAME)
 FOUNDRY_HUB=$(azd env get-value AZURE_AI_FOUNDRY_HUB_NAME)
 echo "      ✓ AI Foundry vars: $FOUNDRY_PROJECT_NAME @ $FOUNDRY_ENDPOINT"
 
-echo "[5/7] Fabric setup"
+echo "[5/8] Fabric setup"
 FABRIC_WORKSPACE=$(azd env get-value FABRIC_WORKSPACE_ID 2>/dev/null) || FABRIC_WORKSPACE=""
 if [ -n "$FABRIC_WORKSPACE" ]; then
   echo "      Fabric workspace already provisioned: $FABRIC_WORKSPACE"
@@ -143,7 +143,7 @@ else
   echo "          --sharepoint-site-id <YOUR_SITE_ID>"
 fi
 
-echo "[6/7] Verifying Teams bot identity (App Registration + Service Principal)"
+echo "[6/8] Verifying Teams bot identity (App Registration + Service Principal)"
 BOT_APP_ID_CHECK=$(azd env get-value BOT_APP_ID 2>/dev/null || echo "")
 if [ -n "$BOT_APP_ID_CHECK" ]; then
   if bot_identity_ensure "$BOT_APP_ID_CHECK"; then
@@ -156,7 +156,58 @@ else
   echo "      · BOT_APP_ID not set yet — nothing to verify (run Phase 2 of install.sh)"
 fi
 
-echo "[7/7] Writing .env file from AZD environment"
+echo "[7/8] Re-wiring SharePoint (managed identity role + container env vars)"
+# SharePoint access is NOT provisioned by Bicep at all — it only ever gets
+# wired up by install.sh Phase 6, which sets SHAREPOINT_SITE_ID in azd env
+# and assigns Sites.ReadWrite.All to the API's managed identity. A fresh
+# teardown + re-provision creates a brand-new managed identity every time,
+# so even with SHAREPOINT_SITE_ID still cached in azd env, the role
+# assignment and container env vars are gone until this runs again — hit
+# this exact gap on 2026-08-19 (generate-and-evaluate silently returned
+# sharepoint_url: null with write_to_sharepoint: true, no error anywhere).
+# Only runs automatically when SHAREPOINT_SITE_ID is already cached — first-time
+# interactive setup (choosing a site/library) still goes through install.sh Phase 6.
+SP_SITE_ID=$(azd env get-value SHAREPOINT_SITE_ID 2>/dev/null || echo "")
+if [ -n "$SP_SITE_ID" ]; then
+  SP_LIBRARY=$(azd env get-value SHAREPOINT_DRAFT_LIBRARY 2>/dev/null || echo "Shared Documents")
+  # Resolved independently rather than reusing step 3's $RESOURCE_GROUP —
+  # that assignment only happens if the ingestion branch runs.
+  RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || echo "")
+  MI_OID=$(az identity list -g "$RESOURCE_GROUP" --query "[0].principalId" -o tsv 2>/dev/null || echo "")
+  GRAPH_SP=$(az ad sp show --id 00000003-0000-0000-c000-000000000000 --query id -o tsv 2>/dev/null || echo "")
+  if [ -n "$MI_OID" ] && [ -n "$GRAPH_SP" ]; then
+    az rest --method POST \
+      --url "https://graph.microsoft.com/v1.0/servicePrincipals/${MI_OID}/appRoleAssignments" \
+      --body "{\"principalId\":\"${MI_OID}\",\"resourceId\":\"${GRAPH_SP}\",\"appRoleId\":\"9492366f-7969-46a4-8d15-ed1a20078fff\"}" \
+      --output none 2>/dev/null \
+      && echo "      ✓ Sites.ReadWrite.All assigned to managed identity" \
+      || echo "      · Role assignment returned an error — likely already assigned, continuing"
+
+    API_APP_NAME=$(az containerapp list -g "$RESOURCE_GROUP" \
+      --query "[?tags.\"azd-service-name\"=='api'].name | [0]" -o tsv 2>/dev/null || echo "")
+    API_IMAGE=$(az containerapp show -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
+      --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
+    if [ -n "$API_APP_NAME" ] && [ -n "$API_IMAGE" ]; then
+      az containerapp update -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
+        --image "$API_IMAGE" \
+        --set-env-vars "SHAREPOINT_SITE_ID=${SP_SITE_ID}" "SHAREPOINT_DRAFT_LIBRARY=${SP_LIBRARY}" \
+        --revision-suffix "spinit$(date +%s)" \
+        --output none \
+        && echo "      ✓ SharePoint env vars set on API container" \
+        || { echo "      ✗ Failed to set SharePoint env vars on API container"; FAILED=1; }
+    else
+      echo "      ✗ Could not resolve API container app — skipping SharePoint env vars"
+      FAILED=1
+    fi
+  else
+    echo "      ✗ Could not resolve managed identity or Graph service principal — skipping SharePoint wiring"
+    FAILED=1
+  fi
+else
+  echo "      · SHAREPOINT_SITE_ID not set — skipping (run: bash scripts/install.sh --from 6)"
+fi
+
+echo "[8/8] Writing .env file from AZD environment"
 cat > .env << EOF
 AZURE_SEARCH_ENDPOINT=${SEARCH_ENDPOINT}
 AZURE_OPENAI_ENDPOINT=${OPENAI_ENDPOINT}
