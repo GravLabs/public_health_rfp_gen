@@ -23,6 +23,16 @@ echo "[1/3] Running azd down (deletes resource group + all resources)..."
 # --force skips interactive confirmation, --purge purges soft-deleted KV and Cognitive Services
 azd down --force --purge
 
+# `azd down` clears AZURE_LOCATION from azd env even though it's a required
+# INPUT parameter, not a derived resource output (unlike AZURE_RESOURCE_GROUP,
+# search/storage endpoints, etc. — those are correctly cleared since the
+# resources are gone). Left unset, the next `azd up` hard-fails non-interactively
+# with "prompt required" instead of reusing the region we just tore down from.
+# Restore it from the value captured above so re-provisioning never needs a
+# manual `azd env set AZURE_LOCATION` step.
+azd env set AZURE_LOCATION "$AZURE_LOCATION"
+echo "      ✓ AZURE_LOCATION restored: $AZURE_LOCATION (next 'azd up' can run unattended)"
+
 echo ""
 echo "[2/4] Purging any remaining soft-deleted Cognitive Services accounts..."
 # azd --purge covers Key Vault; Cognitive Services soft-delete needs a separate purge
