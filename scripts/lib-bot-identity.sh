@@ -84,25 +84,15 @@ bot_identity_ensure() {
   return 0
 }
 
-# Sends a real message through Bot Connector via the bot's Direct Line channel
-# and waits for a reply — the only check that actually proves end-to-end
-# delivery works, independent of Teams app install/upload state.
-bot_identity_roundtrip_test() {
-  local RG="$1" BOT_NAME="$2"
-  local secret conv_id resp attempt
-
-  secret=$(az bot directline show -g "$RG" -n "$BOT_NAME" --with-secrets true \
-    --query "properties.properties.sites[0].key" -o tsv 2>/dev/null || true)
-  if [ -z "$secret" ] || [ "$secret" == "None" ]; then
-    echo "    (Direct Line channel not available on this bot — skipping live round-trip test)"
-    return 0
-  fi
+# One conversation-start + message-send + reply-poll cycle. Internal —
+# callers should use bot_identity_roundtrip_test below, which retries this.
+_bot_identity_roundtrip_attempt() {
+  local secret="$1" conv_id resp attempt
 
   conv_id=$(curl -sf -X POST "https://directline.botframework.com/v3/directline/conversations" \
     -H "Authorization: Bearer $secret" --max-time 15 2>/dev/null \
     | python3 -c "import json,sys; print(json.load(sys.stdin)['conversationId'])" 2>/dev/null || true)
   if [ -z "$conv_id" ]; then
-    echo "    Could not start a Direct Line conversation"
     return 1
   fi
 
@@ -122,6 +112,39 @@ acts = [a for a in d.get('activities', []) if a.get('from', {}).get('id') != 'in
 sys.exit(0 if acts else 1)
 " 2>/dev/null; then
       return 0
+    fi
+  done
+  return 1
+}
+
+# Sends a real message through Bot Connector via the bot's Direct Line channel
+# and waits for a reply — the only check that actually proves end-to-end
+# delivery works, independent of Teams app install/upload state.
+#
+# Retries the whole cycle (fresh conversation each time), not just the
+# reply-poll: a container app that was JUST deployed can report healthy on
+# /health within seconds while its brand-new Container Apps Environment
+# domain is still propagating externally for another minute or two — seen
+# in production on 2026-08-19, where the very first post-deploy check failed
+# but a manual retry ~90s later succeeded immediately.
+bot_identity_roundtrip_test() {
+  local RG="$1" BOT_NAME="$2"
+  local secret cycle
+
+  secret=$(az bot directline show -g "$RG" -n "$BOT_NAME" --with-secrets true \
+    --query "properties.properties.sites[0].key" -o tsv 2>/dev/null || true)
+  if [ -z "$secret" ] || [ "$secret" == "None" ]; then
+    echo "    (Direct Line channel not available on this bot — skipping live round-trip test)"
+    return 0
+  fi
+
+  for cycle in 1 2 3; do
+    if _bot_identity_roundtrip_attempt "$secret"; then
+      return 0
+    fi
+    if [ "$cycle" -lt 3 ]; then
+      echo "    No reply yet (cycle $cycle/3) — endpoint may still be propagating, waiting 30s..."
+      sleep 30
     fi
   done
   return 1

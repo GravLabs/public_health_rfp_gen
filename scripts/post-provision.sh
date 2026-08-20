@@ -1,5 +1,13 @@
 #!/bin/bash
-set -e
+# Deliberately no `set -e`: this script's steps (data uploads, search
+# ingestion, AI Foundry/Fabric info, bot identity check, .env write) are
+# independent of each other and of the deploy phase that follows. A single
+# flaky step (e.g. a storage propagation delay) must not skip the rest —
+# in particular the bot identity check (step 6) and .env write (step 7)
+# are cheap and important even if ingestion upstream failed. Each risky
+# step below tracks its own failure in $FAILED; the script exits non-zero
+# at the end if anything failed, but always runs every step first.
+FAILED=0
 
 echo "=== Post-provision: Public Health RFP POC ==="
 
@@ -34,30 +42,36 @@ CONTAINER="rfp-corpus"
 echo ""
 echo "[1/7] Uploading sample RFPs to blob storage: ${ACCOUNT}/${CONTAINER}"
 if [ -d "data/sample-rfps" ]; then
-  wait_for_container "$ACCOUNT" "$CONTAINER" || exit 1
-  az storage blob upload-batch \
-    --account-name "$ACCOUNT" \
-    --destination "$CONTAINER" \
-    --source "data/sample-rfps" \
-    --pattern "*.md" \
-    --auth-mode key \
-    --overwrite \
-    --output none
+  if wait_for_container "$ACCOUNT" "$CONTAINER"; then
+    az storage blob upload-batch \
+      --account-name "$ACCOUNT" \
+      --destination "$CONTAINER" \
+      --source "data/sample-rfps" \
+      --pattern "*.md" \
+      --auth-mode key \
+      --overwrite \
+      --output none || { echo "      ✗ Sample RFP upload failed"; FAILED=1; }
+  else
+    FAILED=1
+  fi
 else
   echo "      ⚠ data/sample-rfps not found — skipping (add .md files there to populate)"
 fi
 
 echo "[2/7] Uploading eval examples to golden-dataset container"
 if [ -d "data/eval-examples" ]; then
-  wait_for_container "$ACCOUNT" "golden-dataset" || exit 1
-  az storage blob upload-batch \
-    --account-name "$ACCOUNT" \
-    --destination "golden-dataset" \
-    --source "data/eval-examples" \
-    --pattern "*.json" \
-    --auth-mode key \
-    --overwrite \
-    --output none
+  if wait_for_container "$ACCOUNT" "golden-dataset"; then
+    az storage blob upload-batch \
+      --account-name "$ACCOUNT" \
+      --destination "golden-dataset" \
+      --source "data/eval-examples" \
+      --pattern "*.json" \
+      --auth-mode key \
+      --overwrite \
+      --output none || { echo "      ✗ Eval example upload failed"; FAILED=1; }
+  else
+    FAILED=1
+  fi
 else
   echo "      ⚠ data/eval-examples not found — skipping (add .json files there to populate)"
 fi
@@ -90,11 +104,20 @@ if [ -f "src/ingestion/create_index.py" ]; then
 
   echo "      Installing ingestion dependencies..."
   # --target avoids needing python3-venv and bypasses externally-managed-environment
-  pip3 install --target /tmp/pubhealth-ingest-deps -r src/ingestion/requirements.txt -q 2>/dev/null || \
-    pip3 install --target /tmp/pubhealth-ingest-deps -r src/ingestion/requirements.txt -q
-  PYTHONPATH="/tmp/pubhealth-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/create_index.py
-  # pipeline.py imports local siblings (document_parser, chunker, indexer) via PYTHONPATH
-  PYTHONPATH="/tmp/pubhealth-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/pipeline.py
+  if pip3 install --target /tmp/pubhealth-ingest-deps -r src/ingestion/requirements.txt -q 2>/dev/null \
+    || pip3 install --target /tmp/pubhealth-ingest-deps -r src/ingestion/requirements.txt -q; then
+    if PYTHONPATH="/tmp/pubhealth-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/create_index.py; then
+      # pipeline.py imports local siblings (document_parser, chunker, indexer) via PYTHONPATH
+      PYTHONPATH="/tmp/pubhealth-ingest-deps:$PWD/src/ingestion" python3 src/ingestion/pipeline.py \
+        || { echo "      ✗ Ingestion pipeline failed"; FAILED=1; }
+    else
+      echo "      ✗ Search index creation failed"
+      FAILED=1
+    fi
+  else
+    echo "      ✗ Failed to install ingestion dependencies"
+    FAILED=1
+  fi
 else
   echo "      ⚠ src/ingestion/create_index.py not found — skipping ingestion"
 fi
@@ -150,10 +173,17 @@ EOF
 echo "      .env written (do not commit — already in .gitignore)"
 
 echo ""
-echo "=== Post-provision complete ==="
+if [ "$FAILED" -eq 1 ]; then
+  echo "=== Post-provision completed WITH FAILURES (see ✗ above) ==="
+  echo "    Re-run this script to retry — every step here is safe to re-run."
+else
+  echo "=== Post-provision complete ==="
+fi
 echo ""
 echo "Next steps:"
 echo "  1. Run Fabric provisioning:  python fabric/setup.py ..."
 echo "  2. Start orchestrator:       cd src/orchestrator && dotnet run"
 echo "  3. Start API:                cd src/api && uvicorn main:app --reload"
 echo "  4. Run tests:                cd tests && pip install -r requirements-test.txt && pytest -v"
+
+exit "$FAILED"

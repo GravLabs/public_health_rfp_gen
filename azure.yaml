@@ -21,6 +21,9 @@ services:
     host: containerapp
 
 hooks:
+  # preprovision intentionally hard-fails (continueOnError: false): its only
+  # job is to stop a broken bot identity from ever reaching Bicep, so letting
+  # it continue on error would defeat the entire point.
   preprovision:
     posix:
       shell: sh
@@ -38,14 +41,25 @@ hooks:
       run: scripts/post-deploy.ps1
       interactive: true
       continueOnError: true
+  # postprovision must NOT hard-fail: none of its steps (data uploads, search
+  # ingestion, AI Foundry/Fabric info, bot identity check, .env write) are
+  # required for the actual deploy phase or the postdeploy hook (which wires
+  # the Bot Service endpoint and proves the bot works end to end). Before this
+  # was continueOnError: true, a single flaky blob upload or ingestion error
+  # silently aborted the ENTIRE `azd up` before deploy or postdeploy ever ran —
+  # containers never got redeployed and the bot endpoint never got rewired,
+  # with no obvious link between "ingestion failed" and "bot is broken again".
+  # Every step in post-provision.sh is independently safe to re-run (see
+  # scripts/post-provision.sh), so a partial failure here should be loud but
+  # never block the rest of `azd up`.
   postprovision:
     posix:
       shell: sh
       run: scripts/post-provision.sh
       interactive: true
-      continueOnError: false
+      continueOnError: true
     windows:
       shell: pwsh
       run: scripts/post-provision.ps1
       interactive: true
-      continueOnError: false
+      continueOnError: true
