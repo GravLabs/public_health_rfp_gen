@@ -5,6 +5,25 @@ echo "=== Post-provision: Public Health RFP POC ==="
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib-bot-identity.sh"
 
+# Bicep reports the storage account (and its containers) as "Succeeded" before
+# they're reliably queryable on the data plane — a brand-new storage account's
+# containers can 404 on `upload-batch` for several minutes after ARM says
+# they exist. Poll until the container is actually visible instead of
+# guessing a fixed sleep.
+wait_for_container() {
+  local account="$1" container="$2" attempt
+  for attempt in $(seq 1 20); do
+    if az storage container show --account-name "$account" --name "$container" \
+      --auth-mode key --output none 2>/dev/null; then
+      return 0
+    fi
+    echo "      · Container '$container' not yet visible on $account (attempt $attempt/20) — waiting 15s..."
+    sleep 15
+  done
+  echo "      ✗ Container '$container' never became visible after 5 minutes."
+  return 1
+}
+
 # ── Resolve AZD environment variables ────────────────────────────────────────
 ACCOUNT=$(azd env get-value AZURE_STORAGE_ACCOUNT)
 SEARCH_ENDPOINT=$(azd env get-value AZURE_SEARCH_ENDPOINT)
@@ -15,6 +34,7 @@ CONTAINER="rfp-corpus"
 echo ""
 echo "[1/7] Uploading sample RFPs to blob storage: ${ACCOUNT}/${CONTAINER}"
 if [ -d "data/sample-rfps" ]; then
+  wait_for_container "$ACCOUNT" "$CONTAINER" || exit 1
   az storage blob upload-batch \
     --account-name "$ACCOUNT" \
     --destination "$CONTAINER" \
@@ -29,6 +49,7 @@ fi
 
 echo "[2/7] Uploading eval examples to golden-dataset container"
 if [ -d "data/eval-examples" ]; then
+  wait_for_container "$ACCOUNT" "golden-dataset" || exit 1
   az storage blob upload-batch \
     --account-name "$ACCOUNT" \
     --destination "golden-dataset" \
