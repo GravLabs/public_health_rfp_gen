@@ -67,6 +67,9 @@ if [ -f "src/ingestion/create_index.py" ]; then
   export AZURE_SEARCH_ENDPOINT="$SEARCH_ENDPOINT"
   export AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT"
   export AZURE_STORAGE_ACCOUNT="$ACCOUNT"
+  # Without this, indexer.py falls back to its own hardcoded default, which
+  # has drifted from the model Bicep actually deploys — see indexer.py.
+  export AZURE_OPENAI_EMBEDDING_DEPLOYMENT="$(azd env get-value AZURE_OPENAI_EMBEDDING_DEPLOYMENT 2>/dev/null || echo text-embedding-3-small)"
 
   # CLI user lacks data-plane RBAC on Search and OpenAI — fetch keys via ARM
   RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)

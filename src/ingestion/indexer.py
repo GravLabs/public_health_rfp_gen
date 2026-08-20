@@ -17,7 +17,7 @@ from chunker import Chunk
 SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")
 INDEX_NAME = os.getenv("AZURE_SEARCH_INDEX", "pubhealth-rfp-index")
 OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-EMBEDDING_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-large")
+EMBEDDING_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small")
 BATCH_SIZE = 16
 
 
