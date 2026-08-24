@@ -158,6 +158,13 @@ module containerApps 'modules/container-apps.bicep' = {
       { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: monitoring.outputs.appInsightsConnectionString }
     ]
     apiEnvVars: [
+      // The .NET orchestrator's Azure Monitor SDK auto-detects the Container
+      // App name as its telemetry role name; the Python SDK does not, and
+      // silently falls back to "unknown_service" instead — confirmed via a
+      // live query showing every other Container App service correctly
+      // labeled except this one. OTEL_SERVICE_NAME is the standard explicit
+      // override.
+      { name: 'OTEL_SERVICE_NAME', value: 'pubhealth-rfp-api' }
       { name: 'AZURE_CLIENT_ID', value: identity.outputs.clientId }
       { name: 'AZURE_OPENAI_ENDPOINT', value: openAi.outputs.endpoint }
       { name: 'AZURE_OPENAI_GPT_DEPLOYMENT', value: openAiModelName }
@@ -243,6 +250,7 @@ output AZURE_STORAGE_ACCOUNT string = storage.outputs.name
 output AZURE_STORAGE_CONTAINER string = 'rfp-corpus'
 
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.appInsightsConnectionString
+output AZURE_MONITOR_WORKBOOK_ID string = monitoring.outputs.workbookId
 
 output AZURE_APIM_GATEWAY_URL string = apim.outputs.gatewayUrl
 output AZURE_APIM_NAME string = apim.outputs.apimName
