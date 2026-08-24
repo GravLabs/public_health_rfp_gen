@@ -143,6 +143,7 @@ def _result_card(event: dict, subtitle: str) -> dict[str, Any]:
         })
 
     draft_id = event.get("draft_id", "")
+    sections = event.get("sections", {})
 
     actions = []
     if passed and sp_url:
@@ -157,6 +158,46 @@ def _result_card(event: dict, subtitle: str) -> dict[str, Any]:
             "title": "✅ Approve & Save to SharePoint",
             "data": {"action": "approve_rfp", "draft_id": draft_id},
         })
+
+    # Reject/Edit are offered regardless of gate pass/fail — a FAILED draft is
+    # exactly the case where editing a section to fix it matters most.
+    if draft_id:
+        actions.append({
+            "type": "Action.Submit",
+            "title": "❌ Reject",
+            "data": {"action": "reject_rfp", "draft_id": draft_id},
+        })
+        if sections:
+            actions.append({
+                "type": "Action.ShowCard",
+                "title": "✏️ Edit Section",
+                "card": {
+                    "type": "AdaptiveCard",
+                    "body": [
+                        {
+                            "type": "Input.ChoiceSet",
+                            "id": "section_key",
+                            "label": "Section",
+                            "value": next(iter(sections)),
+                            "choices": [
+                                {"title": key.replace("_", " ").title(), "value": key}
+                                for key in sections
+                            ],
+                        },
+                        {
+                            "type": "Input.Text",
+                            "id": "new_text",
+                            "label": "New text",
+                            "isMultiline": True,
+                        },
+                    ],
+                    "actions": [{
+                        "type": "Action.Submit",
+                        "title": "Submit Edit",
+                        "data": {"action": "edit_rfp_section", "draft_id": draft_id},
+                    }],
+                },
+            })
 
     return {
         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
@@ -465,6 +506,59 @@ class RfpBotHandler(ActivityHandler):
                 await turn_context.send_activity(Activity(type=ActivityTypes.message, text=msg))
             except Exception as e:
                 await turn_context.send_activity(f"SharePoint upload failed: {e}")
+            return
+
+        if isinstance(value, dict) and value.get("action") == "reject_rfp":
+            draft_id = value.get("draft_id", "")
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    resp = await client.post(f"{API_URL}/drafts/{draft_id}/reject", json={})
+                    if resp.status_code == 404:
+                        await turn_context.send_activity("Draft not found — it may have expired.")
+                        return
+                    resp.raise_for_status()
+                await turn_context.send_activity("❌ Draft rejected.")
+            except Exception as e:
+                await turn_context.send_activity(f"Reject failed: {e}")
+            return
+
+        if isinstance(value, dict) and value.get("action") == "edit_rfp_section":
+            draft_id = value.get("draft_id", "")
+            section_key = value.get("section_key", "")
+            new_text = value.get("new_text", "")
+            await turn_context.send_activity("Applying edit and re-evaluating…")
+            try:
+                async with httpx.AsyncClient(timeout=60) as client:
+                    resp = await client.post(
+                        f"{API_URL}/drafts/{draft_id}/edit",
+                        json={"sections": {section_key: new_text}},
+                    )
+                    if resp.status_code == 404:
+                        await turn_context.send_activity("Draft not found — it may have expired.")
+                        return
+                    resp.raise_for_status()
+                    evaluation = resp.json()
+
+                    draft_resp = await client.get(f"{API_URL}/drafts/{draft_id}")
+                    draft_resp.raise_for_status()
+                    draft_state = draft_resp.json()
+
+                event = {
+                    "passed": evaluation["gate_decision"] == "PASS",
+                    "scores": evaluation["scores"],
+                    "failure_reasons": evaluation["failure_reasons"],
+                    "sharepoint_url": "",
+                    "draft_id": draft_id,
+                    "rfp_id": evaluation["rfp_id"],
+                    "sections": draft_state.get("sections", {}),
+                }
+                subtitle = f"Edited: {section_key.replace('_', ' ').title()}"
+                card = _result_card(event, subtitle)
+                await turn_context.send_activity(
+                    Activity(type=ActivityTypes.message, attachments=[CardFactory.adaptive_card(card)])
+                )
+            except Exception as e:
+                await turn_context.send_activity(f"Edit failed: {e}")
             return
 
         # Check for file attachments — route directly to proposal review.
