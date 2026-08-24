@@ -191,7 +191,7 @@ Two known limitations are accepted for this POC and documented here for producti
 
 | Limitation | Impact | Production fix |
 |---|---|---|
-| **Draft cache is in-memory** | If the API container restarts between generation and the user clicking "Approve", the draft is lost and the user sees a 404. | Replace `_draft_cache` in `src/api/main.py` with a Redis cache or Cosmos DB item with a short TTL. |
+| **Draft cache is in-memory** | If the API container restarts between generation and the user clicking "Approve", the draft is lost and the user sees a 404. (The content itself isn't fully gone — every generation and edit is also archived to Fabric OneLake unconditionally — but re-approving to SharePoint after a restart isn't possible without more code.) | Replace `_draft_cache` in `src/api/main.py` with a Redis cache or Cosmos DB item with a short TTL. |
 | **APIM Consumption SKU** | Token-per-minute limiting, semantic caching, and token metric emission require APIM Standard v2. The Consumption tier used here has none of these. | Upgrade to Standard v2 (~$140/mo) and restore the full policy XML from git history. |
 
 ---

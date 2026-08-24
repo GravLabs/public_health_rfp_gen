@@ -623,7 +623,25 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
             <td>POST</td>
             <td class="mono-cell">/export/{draft_id}</td>
             <td>—</td>
-            <td>Assembles Word doc from cached draft, uploads to SharePoint, returns <code>sharepoint_url</code></td>
+            <td>Approve: assembles Word doc from cached draft, uploads to SharePoint, returns <code>sharepoint_url</code>. Only SharePoint write path — every draft edit writes a new version to Fabric OneLake instead (see Fabric section), so SharePoint always holds just the one approved copy.</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td class="mono-cell">/drafts/{draft_id}</td>
+            <td>—</td>
+            <td>Current status (<code>PENDING</code>/<code>APPROVED</code>/<code>REJECTED</code>), gate decision, and sections for a cached draft</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td class="mono-cell">/drafts/{draft_id}/reject</td>
+            <td><code>reason</code> (optional)</td>
+            <td>Marks the draft rejected — no persistence side effects</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td class="mono-cell">/drafts/{draft_id}/edit</td>
+            <td><code>sections</code> (partial — only changed keys)</td>
+            <td>Applies the edit, re-runs the eval gate, resets status to <code>PENDING</code>, writes a new versioned copy to Fabric OneLake unconditionally</td>
           </tr>
           <tr>
             <td>GET</td>
@@ -636,6 +654,7 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
     </div>
 
     <p>All endpoints use <code>DefaultAzureCredential</code> — no API keys in configuration. The lifespan context manager initializes all SDK clients (AI Search, Foundry, APIM token) at startup.</p>
+    <p>The Teams result card offers all three review actions: <strong>Approve &amp; Save to SharePoint</strong>, <strong>Reject</strong>, and <strong>Edit Section</strong> (an inline expanding card with a section picker + text box) — available regardless of gate pass/fail, since a failed draft is exactly when editing to fix it matters most.</p>
   </section>
 
   <!-- ── UX Options ──────────────────────────────────────────────────────────── -->
@@ -1106,6 +1125,10 @@ flowchart TD
   <!-- ── Fabric / OneLake ────────────────────────────────────────────────────── -->
   <section id="fabric">
     <h2>Microsoft Fabric / OneLake</h2>
+    <p>Every draft version is archived to OneLake unconditionally, independent of the SharePoint approval flow — the initial generation and every subsequent edit each write a distinct file (<code>{rfp_id}_{draft_id}.md</code>, then <code>_v1.md</code>, <code>_v2.md</code>, ...) to <code>Files/generated-drafts</code>, plus a matching eval-score record to <code>Files/eval-results</code>. SharePoint, by contrast, only ever holds the single most-recently-approved copy (see API Surface above) — Fabric is the full version history, SharePoint is the current approved artifact.</p>
+
+    <p>The RFP corpus itself syncs from a SharePoint document library into <code>Files/rfp-corpus</code> via a standalone Fabric <strong>Copy Job</strong> item running in CDC (Change Data Capture) mode, so new or changed files sync automatically on Fabric's schedule. Two non-obvious configuration requirements, both required regardless of which auth method is used: the connector needs <code>Sites.Selected</code> Graph/SharePoint Online permissions plus a mandatory site-level permission grant (tenant-wide <code>Sites.Read.All</code>/<code>ReadWrite.All</code> do not satisfy it); and the copy must use <strong>Binary</strong> file format, not the portal wizard's default (<code>DelimitedText</code>), which would parse document contents as CSV and corrupt anything non-tabular (<code>.docx</code>, <code>.md</code>, etc.). Credentials: the workspace's own Fabric-managed identity (<code>WorkspaceIdentity</code>) — <code>ServicePrincipal</code> auth is documented by Microsoft as unsupported for Copy operations (Dataflow Gen2 only).</p>
+
     <p>Fabric Lakehouse (<code>FABRIC_LAKEHOUSE_ID</code>) holds 6 Delta tables auto-discovered by a Power BI semantic model.</p>
 
     <div class="table-wrap">
@@ -1130,7 +1153,7 @@ flowchart TD
   <!-- ── Observability ───────────────────────────────────────────────────────── -->
   <section id="observability">
     <h2>Observability</h2>
-    <p>OpenTelemetry traces shipped to Azure Monitor via <code>APPLICATIONINSIGHTS_CONNECTION_STRING</code>. Custom span attribute namespaces: <code>gen_ai.*</code> (AI Foundry built-in), <code>rag.*</code>, <code>eval.*</code>, <code>pubhealth.*</code>.</p>
+    <p>OpenTelemetry spans shipped to Azure Monitor via <code>APPLICATIONINSIGHTS_CONNECTION_STRING</code>, landing in Log Analytics' <code>AppRequests.Properties</code> for the <code>POST /generate-and-evaluate</code>/<code>/generate/stream</code> request span. The API container reports as role name <code>pubhealth-rfp-api</code> (set via <code>OTEL_SERVICE_NAME</code> — without it, the Python OTel SDK falls back to <code>unknown_service</code>, unlike the .NET orchestrator which auto-detects its own Container App name).</p>
 
     <div class="table-wrap">
       <table>
@@ -1138,23 +1161,27 @@ flowchart TD
           <tr><th>Span Attribute</th><th>Example Value</th><th>Purpose</th></tr>
         </thead>
         <tbody>
-          <tr><td class="mono-cell">gen_ai.system</td><td>azure.openai</td><td>AI Foundry OTel built-in</td></tr>
-          <tr><td class="mono-cell">gen_ai.request.model</td><td>gpt-4o-finetuned</td><td>Which deployment served the request</td></tr>
-          <tr><td class="mono-cell">gen_ai.usage.prompt_tokens</td><td>1842</td><td>Token cost tracking</td></tr>
-          <tr><td class="mono-cell">rag.retrieval.query</td><td>"influenza surveillance scope"</td><td>Search query for debugging retrieval</td></tr>
-          <tr><td class="mono-cell">rag.retrieval.top_k</td><td>8</td><td>Chunks returned</td></tr>
-          <tr><td class="mono-cell">rag.retrieval.score_top1</td><td>0.923</td><td>Top similarity score for relevance monitoring</td></tr>
-          <tr><td class="mono-cell">eval.dimension</td><td>groundedness</td><td>Which evaluator dimension</td></tr>
-          <tr><td class="mono-cell">eval.score</td><td>0.91</td><td>Raw evaluator score</td></tr>
-          <tr><td class="mono-cell">eval.pass</td><td>true</td><td>Gate pass/fail per dimension</td></tr>
-          <tr><td class="mono-cell">pubhealth.program_area</td><td>influenza_surveillance</td><td>Program area for segmented dashboards</td></tr>
-          <tr><td class="mono-cell">pubhealth.rfp_id</td><td>RFP-2024-FLU-027</td><td>End-to-end trace correlation</td></tr>
-          <tr><td class="mono-cell">pubhealth.sponsor</td><td>CDC</td><td>Funding sponsor dimension</td></tr>
+          <tr><td class="mono-cell">pubhealth.draft_id</td><td>af279f594282</td><td>End-to-end trace correlation</td></tr>
+          <tr><td class="mono-cell">pubhealth.rfp_id</td><td>Public Health Labs-RFP-2026-FOODILLN-GEN</td><td>RFP identifier</td></tr>
+          <tr><td class="mono-cell">pubhealth.program_area</td><td>Foodborne Illness Surveillance</td><td>Program area for segmented dashboards</td></tr>
+          <tr><td class="mono-cell">pubhealth.gate_decision</td><td>PASS</td><td>Gate pass/fail for this generation</td></tr>
+          <tr><td class="mono-cell">llm.prompt_tokens</td><td>16591</td><td>Token cost tracking</td></tr>
+          <tr><td class="mono-cell">llm.completion_tokens</td><td>2229</td><td>Token cost tracking</td></tr>
+          <tr><td class="mono-cell">llm.estimated_cost_usd</td><td>0.063768</td><td>Per-draft cost at GPT-4o rates</td></tr>
+          <tr><td class="mono-cell">eval.completeness</td><td>1.0</td><td>Section-completeness evaluator score</td></tr>
+          <tr><td class="mono-cell">eval.groundedness</td><td>1.0</td><td>Groundedness evaluator score</td></tr>
+          <tr><td class="mono-cell">eval.coherence</td><td>1.0</td><td>Coherence evaluator score</td></tr>
+          <tr><td class="mono-cell">eval.compliance</td><td>0.875</td><td>Compliance-coverage evaluator score</td></tr>
+          <tr><td class="mono-cell">eval.parameter_accuracy</td><td>1.0</td><td>Funding-parameter accuracy score</td></tr>
         </tbody>
       </table>
     </div>
 
-    <p>Key file: <code>src/api/observability.py</code> — <code>get_tracer()</code> helper + span attribute constants. <code>src/api/budget_monitor.py</code> — polls APIM token-metric and raises alert at 80% / 95% of <code>MONTHLY_BUDGET_USD</code>.</p>
+    <p>An Azure Monitor Workbook ("Public Health RFP — Generation Metrics") reads these directly: cost-per-draft over time, gate pass/fail rate, eval score trends, and hourly token usage — all backed by live KQL queries against <code>AppRequests</code>, not a separate export pipeline.</p>
+
+    <p><strong>Real measured cost</strong>: ~$0.04–0.06 per draft at GPT-4o pricing, varying with section length (e.g. 15,491 prompt + 2,317 completion tokens → $0.0619). Note the streaming path (<code>/generate/stream</code>, what the Teams bot uses) captures real per-section token counts from the orchestrator — an earlier version of this pipeline hardcoded zero here, which would have under-reported cost for every real Teams conversation.</p>
+
+    <p>Key file: <code>src/api/observability.py</code> — <code>record_generation_span()</code>/<code>record_evaluation_span()</code>, called from <code>src/api/main.py</code>'s generation endpoints. Must be wired up synchronously right after <code>FastAPI()</code> construction, not inside the async <code>lifespan</code> handler — <code>FastAPIInstrumentor</code> has to wrap the app before Starlette's middleware stack is built, or it silently never captures anything. <code>src/api/budget_monitor.py</code>'s <code>session_tracker</code> accumulates per-process token/cost totals, exposed via <code>GET /budget</code>; a separate <code>BudgetMonitor</code> class queries Azure Cost Management for actual tenant spend when <code>AZURE_SUBSCRIPTION_ID</code>/<code>AZURE_RESOURCE_GROUP</code> are configured on the container (optional — not required for the session-level cost tracking above).</p>
   </section>
 
   <!-- ── Container Apps ─────────────────────────────────────────────────────── -->
