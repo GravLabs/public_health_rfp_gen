@@ -161,7 +161,6 @@ else
   echo "      To provision, run:"
   echo "        python fabric/setup.py \\"
   echo "          --workspace-name pubhealth-rfp-poc \\"
-  echo "          --ai-search-endpoint \$AZURE_SEARCH_ENDPOINT \\"
   echo "          --sharepoint-site-id <YOUR_SITE_ID>"
 fi
 

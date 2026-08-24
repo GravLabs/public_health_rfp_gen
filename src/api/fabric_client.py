@@ -1,6 +1,6 @@
 """
 Microsoft Fabric integration via REST API.
-Manages: Workspace, Lakehouse (OneLake storage), AI Skill, and evaluation telemetry.
+Manages: Workspace, Lakehouse (OneLake storage), ingestion pipeline, and evaluation telemetry.
 Uses DefaultAzureCredential — requires Fabric Workspace Admin or Contributor role.
 
 Fabric REST API reference: https://api.fabric.microsoft.com/v1
@@ -198,62 +198,19 @@ class FabricClient:
 
         return await self.upload_rfp_document(file_name, content, folder="eval-results")
 
-    async def write_draft_to_lakehouse(self, draft_id: str, rfp_id: str, content_md: str) -> str:
-        """Write a generated RFP draft to OneLake for archival and Power BI lineage."""
-        file_name = f"{rfp_id}_{draft_id}.md"
-        return await self.upload_rfp_document(file_name, content_md.encode(), folder="generated-drafts")
-
-    # ── AI Skill ──────────────────────────────────────────────────────────────
-
-    @classmethod
-    async def provision_ai_skill(
-        cls,
-        workspace_id: str,
-        skill_name: str,
-        ai_search_endpoint: str,
-        ai_search_index: str,
-        credential: Optional[DefaultAzureCredential] = None,
+    async def write_draft_to_lakehouse(
+        self, draft_id: str, rfp_id: str, content_md: str, version: Optional[int] = None
     ) -> str:
-        """Create a Fabric AI Skill backed by Azure AI Search. Returns skill ID."""
-        cred = credential or DefaultAzureCredential()
-        token = get_bearer_token_provider(cred, FABRIC_SCOPE)()
-        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        """Write a generated RFP draft to OneLake for archival and Power BI lineage.
 
-        skill_definition = {
-            "displayName": skill_name,
-            "type": "AISkill",
-            "definition": {
-                "parts": [{
-                    "type": "AISkillDefinition",
-                    "payload": json.dumps({
-                        "schemaVersion": 1,
-                        "instruction": (
-                            "You are an expert on Public Health Labs public health laboratory RFPs and CDC cooperative agreements. "
-                            "Answer questions about funding opportunities, eligibility requirements, and program scopes "
-                            "based only on the indexed RFP corpus. Always cite the RFP ID when referencing specific content."
-                        ),
-                        "dataSources": [{
-                            "type": "AzureAISearch",
-                            "endpoint": ai_search_endpoint,
-                            "indexName": ai_search_index,
-                            "authentication": {"type": "ManagedIdentity"}
-                        }]
-                    })
-                }]
-            }
-        }
-
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                f"{FABRIC_BASE}/workspaces/{workspace_id}/items",
-                headers=headers,
-                json=skill_definition
-            )
-            resp.raise_for_status()
-
-        skill_id = resp.json()["id"]
-        log.info("Fabric AI Skill created: %s (%s)", skill_name, skill_id)
-        return skill_id
+        `version` distinguishes edits of the same draft_id — without it, every
+        edit would silently overwrite the previous file at the same path since
+        the filename is otherwise static (no timestamp, unlike write_eval_record).
+        Original generation omits it; each subsequent edit passes an incrementing
+        version so the full history accumulates as distinct files."""
+        suffix = f"_v{version}" if version else ""
+        file_name = f"{rfp_id}_{draft_id}{suffix}.md"
+        return await self.upload_rfp_document(file_name, content_md.encode(), folder="generated-drafts")
 
     # ── Fabric Pipeline ───────────────────────────────────────────────────────
 
