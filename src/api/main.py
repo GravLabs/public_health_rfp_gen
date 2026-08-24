@@ -226,6 +226,7 @@ async def generate_and_evaluate(request: RfpRequest) -> GenerateAndEvaluateRespo
         "status": DraftStatus.PENDING,
         "gate_decision": evaluation.gate_decision,
         "reject_reason": None,
+        "edit_version": 0,
     }
 
     return GenerateAndEvaluateResponse(
@@ -320,6 +321,7 @@ async def generate_stream(request: RfpRequest):
                 "status": DraftStatus.PENDING,
                 "gate_decision": evaluation.gate_decision,
                 "reject_reason": None,
+                "edit_version": 0,
             }
 
             yield json.dumps({
@@ -432,6 +434,27 @@ async def edit_draft(draft_id: str, body: EditDraftRequest) -> EvaluationResult:
 
     cached["gate_decision"] = evaluation.gate_decision
     cached["status"] = DraftStatus.PENDING
+
+    # Fabric gets every version unconditionally, regardless of the original
+    # request's write_to_fabric flag — SharePoint stays approve-only (unchanged,
+    # see /export). Each edit increments edit_version so OneLake accumulates
+    # distinct files rather than the static filename silently overwriting the
+    # previous version on every edit.
+    if _fabric_client:
+        cached["edit_version"] += 1
+        md_content = SharePointClient.draft_to_markdown(cached["rfp_id"], cached["sections"])
+        await _fabric_client.write_draft_to_lakehouse(
+            draft_id, cached["rfp_id"], md_content, version=cached["edit_version"],
+        )
+        await _fabric_client.write_eval_record({
+            "draft_id": draft_id,
+            "rfp_id": cached["rfp_id"],
+            "program_area": cached["program_area"],
+            "gate_decision": evaluation.gate_decision.value,
+            "scores": evaluation.scores.model_dump(),
+            "failure_reasons": evaluation.failure_reasons,
+            "edit_version": cached["edit_version"],
+        })
 
     return evaluation
 
