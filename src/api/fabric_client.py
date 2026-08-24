@@ -8,6 +8,7 @@ Fabric trial: https://learn.microsoft.com/fabric/get-started/fabric-trial
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -105,6 +106,80 @@ class FabricClient:
             )
             resp.raise_for_status()
         log.info("Fabric workspace %s: granted %s role to %s %s", workspace_id, role, principal_type, principal_id)
+
+    # Microsoft Graph Command Line Tools — a Microsoft first-party client ID
+    # (used by Connect-MgGraph) that is pre-authorized for broad delegated
+    # Graph scopes including Sites.FullControl.All. Deliberately NOT Azure
+    # CLI's own client ID (04b07795-8ddb-461a-bbee-02f9e1bf7b46) — requesting
+    # Sites.FullControl.All against that one fails with AADSTS65002 ("must be
+    # configured via preauthorization"), confirmed live. Graph Explorer's app
+    # also works but has no scriptable API; this client ID gives the same
+    # pre-authorization via a plain device-code flow we can drive ourselves.
+    _GRAPH_CLI_CLIENT_ID = "14d82eec-204b-4c2f-b7e8-296a70dab67e"
+
+    @classmethod
+    async def acquire_delegated_graph_token(
+        cls, tenant_id: str, scope: str = "https://graph.microsoft.com/Sites.FullControl.All",
+        poll_timeout_s: int = 600,
+    ) -> str:
+        """Device-code flow for one-off delegated Graph calls that need a scope
+        the signed-in operator's own session doesn't have (e.g. granting
+        site-level SharePoint permissions — see fabric/setup.py's "SharePoint
+        Connection Prerequisites" for why this exists). Prints a URL + code for
+        the operator to complete in a browser, then polls until they do."""
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/devicecode",
+                data={"client_id": cls._GRAPH_CLI_CLIENT_ID, "scope": scope},
+            )
+            resp.raise_for_status()
+            device = resp.json()
+            print(f"\n  To authorize, open {device['verification_uri']} and enter code: {device['user_code']}\n")
+
+            interval = device.get("interval", 5)
+            elapsed = 0
+            while elapsed < poll_timeout_s:
+                await asyncio.sleep(interval)
+                elapsed += interval
+                token_resp = await client.post(
+                    f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+                    data={
+                        "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                        "client_id": cls._GRAPH_CLI_CLIENT_ID,
+                        "device_code": device["device_code"],
+                    },
+                )
+                body = token_resp.json()
+                if "access_token" in body:
+                    return body["access_token"]
+                if body.get("error") not in ("authorization_pending", "slow_down"):
+                    raise RuntimeError(f"Device code authentication failed: {body}")
+        raise RuntimeError(f"Device code authentication timed out after {poll_timeout_s}s")
+
+    @classmethod
+    async def grant_site_permission(
+        cls, site_id: str, app_client_id: str, app_display_name: str, tenant_id: str,
+    ) -> dict:
+        """Grant an Entra app read access to a specific SharePoint site via
+        Graph's /sites/{id}/permissions — the mandatory site-level step for
+        Sites.Selected (tenant-wide Sites.Read.All/ReadWrite.All do not
+        satisfy the Fabric SharePoint connector, confirmed live). Requires a
+        delegated token with Sites.FullControl.All, acquired via
+        acquire_delegated_graph_token since neither the operator's own az CLI
+        session nor an app-only token typically has this."""
+        token = await cls.acquire_delegated_graph_token(tenant_id)
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"https://graph.microsoft.com/v1.0/sites/{site_id}/permissions",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json={
+                    "roles": ["read"],
+                    "grantedToIdentities": [{"application": {"id": app_client_id, "displayName": app_display_name}}],
+                },
+            )
+            resp.raise_for_status()
+        log.info("Granted site %s read access to app %s", site_id, app_client_id)
+        return resp.json()
 
     @classmethod
     async def find_trial_capacity_id(cls, credential: Optional[DefaultAzureCredential] = None) -> str:

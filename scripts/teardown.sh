@@ -1,8 +1,8 @@
 #!/bin/bash
 # Tears down all Azure resources for this environment.
 # Purges soft-deleted Key Vault, Cognitive Services, and APIM, and deletes the
-# bot's Entra ID App Registration + Service Principal (tenant-level objects
-# that survive azd down) so the next `azd up` starts clean.
+# bot's and Fabric pipeline's Entra ID App Registrations + Service Principals
+# (tenant-level objects that survive azd down) so the next `azd up` starts clean.
 set -e
 
 echo "=== Teardown: Public Health RFP POC ==="
@@ -20,9 +20,10 @@ RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || echo "")
 AZURE_LOCATION=$(azd env get-value AZURE_LOCATION 2>/dev/null || echo "eastus")
 ENV_NAME=$(azd env get-value AZURE_ENV_NAME 2>/dev/null || echo "")
 BOT_APP_ID=$(azd env get-value BOT_APP_ID 2>/dev/null || echo "")
+FABRIC_PIPELINE_APP_ID=$(azd env get-value FABRIC_PIPELINE_APP_ID 2>/dev/null || echo "")
 
 echo ""
-echo "[1/5] Running azd down (deletes resource group + all resources)..."
+echo "[1/6] Running azd down (deletes resource group + all resources)..."
 # --force skips interactive confirmation, --purge purges soft-deleted KV and Cognitive Services
 azd down --force --purge
 
@@ -37,7 +38,7 @@ azd env set AZURE_LOCATION "$AZURE_LOCATION"
 echo "      ✓ AZURE_LOCATION restored: $AZURE_LOCATION (next 'azd up' can run unattended)"
 
 echo ""
-echo "[2/5] Purging any remaining soft-deleted Cognitive Services accounts..."
+echo "[2/6] Purging any remaining soft-deleted Cognitive Services accounts..."
 # azd --purge covers Key Vault; Cognitive Services soft-delete needs a separate purge
 if [ -n "$RESOURCE_GROUP" ] && [ -n "$AZURE_LOCATION" ]; then
   DELETED=$(az cognitiveservices account list-deleted \
@@ -56,7 +57,7 @@ if [ -n "$RESOURCE_GROUP" ] && [ -n "$AZURE_LOCATION" ]; then
 fi
 
 echo ""
-echo "[3/5] Purging any remaining soft-deleted API Management instances..."
+echo "[3/6] Purging any remaining soft-deleted API Management instances..."
 # API Management soft-deletes on removal too; azd --purge doesn't cover it.
 # Name/location come straight from the deleted-service list to avoid region
 # string-format mismatches (e.g. 'eastus' vs 'East US').
@@ -72,7 +73,7 @@ else
 fi
 
 echo ""
-echo "[4/5] Deleting bot Entra ID App Registration + Service Principal..."
+echo "[4/6] Deleting bot Entra ID App Registration + Service Principal..."
 # azd down only removes the resource group — the bot's Entra ID App
 # Registration and Service Principal are tenant-level objects outside any RG,
 # so they survive azd down untouched. Left behind, the next install.sh run
@@ -98,7 +99,34 @@ else
 fi
 
 echo ""
-echo "[5/5] Clearing local AZD environment state..."
+echo "[5/6] Deleting Fabric pipeline Entra ID App Registration + Service Principal..."
+# Same tenant-level-object gap as the bot App Registration above — azd down
+# doesn't touch it. Deleting the app is sufficient cleanup: it invalidates any
+# possible auth as this identity immediately. We deliberately do NOT also try
+# to delete the site-level SharePoint permission grant this app was given
+# (POST /sites/{id}/permissions) — that requires re-running the interactive
+# Sites.FullControl.All device-code flow (see FabricClient.grant_site_permission
+# / fabric/setup.py's "SharePoint Connection Prerequisites"), which is a real
+# interactive burden for a teardown step. Once the app itself is gone, the
+# stale permission entry is inert — nothing can ever authenticate as an
+# App Registration that no longer exists — so it's harmless to leave behind.
+if [ -n "$FABRIC_PIPELINE_APP_ID" ]; then
+  if az ad app show --id "$FABRIC_PIPELINE_APP_ID" &>/dev/null; then
+    echo "      Deleting App Registration $FABRIC_PIPELINE_APP_ID (soft-deleted in Entra ID for 30 days, recoverable)..."
+    if az ad app delete --id "$FABRIC_PIPELINE_APP_ID" 2>/dev/null; then
+      echo "      ✓ App Registration + Service Principal deleted"
+    else
+      echo "      ✗ Failed to delete App Registration $FABRIC_PIPELINE_APP_ID — check permissions and remove manually if needed"
+    fi
+  else
+    echo "      App Registration $FABRIC_PIPELINE_APP_ID already gone."
+  fi
+else
+  echo "      No FABRIC_PIPELINE_APP_ID in azd env — nothing to delete."
+fi
+
+echo ""
+echo "[6/6] Clearing local AZD environment state..."
 if [ -d ".azure" ]; then
   echo ""
   echo "  WARNING: .azure/ holds saved secrets (BOT_APP_SECRET, SHAREPOINT_SITE_ID, etc.)."
