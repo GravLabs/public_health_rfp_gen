@@ -256,6 +256,9 @@ async def generate_stream(request: RfpRequest):
         try:
             yield json.dumps({"type": "started", "draft_id": draft_id, "rfp_id": rfp_id}) + "\n"
 
+            total_prompt_tokens = 0
+            total_completion_tokens = 0
+
             async with httpx.AsyncClient(timeout=300) as client:
                 async with client.stream(
                     "POST", f"{ORCHESTRATOR_URL}/generate/stream",
@@ -268,6 +271,12 @@ async def generate_stream(request: RfpRequest):
                         evt = json.loads(line)
                         if evt["type"] == "section":
                             sections[evt["sectionKey"]] = evt.get("sectionText", "")
+                            # The orchestrator computes real per-section token counts
+                            # (RfpOrchestrationService.cs's SectionStreamEvent) — accumulate
+                            # them instead of discarding, so this path reports real cost
+                            # like /generate-and-evaluate does rather than always zero.
+                            total_prompt_tokens += evt.get("promptTokens", 0)
+                            total_completion_tokens += evt.get("completionTokens", 0)
                             yield json.dumps({
                                 "type": "section",
                                 "section_key": evt["sectionKey"],
@@ -284,15 +293,15 @@ async def generate_stream(request: RfpRequest):
                 generated_at=datetime.utcnow().isoformat() + "Z",
                 sections=sections,
                 grounding_chunks=[],
-                token_usage=TokenUsage(prompt_tokens=0, completion_tokens=0),
+                token_usage=TokenUsage(
+                    prompt_tokens=total_prompt_tokens,
+                    completion_tokens=total_completion_tokens,
+                    total_tokens=total_prompt_tokens + total_completion_tokens,
+                ),
             )
             evaluation = await _run_evaluation(draft, request)
             draft = await _persist_draft(draft, request, evaluation)
 
-            # NOTE: token_usage is hardcoded to zero on this streaming path (the
-            # orchestrator's /generate/stream NDJSON doesn't emit token counts per
-            # section today), so cost telemetry here will under-report vs the
-            # non-streaming /generate-and-evaluate path. Known gap, not fixed here.
             session_tracker.record_generation(draft.token_usage.prompt_tokens, draft.token_usage.completion_tokens)
             span = trace.get_current_span()
             record_generation_span(span, draft.draft_id, draft.rfp_id, draft.program_area,

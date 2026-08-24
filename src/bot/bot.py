@@ -667,5 +667,5 @@ def _parse_rfp_request(text: str) -> dict | None:
         "cost_sharing_required": "cost shar" in text.lower(),
         "key_requirements": [],
         "write_to_sharepoint": False,
-        "write_to_fabric": False,
+        "write_to_fabric": True,
     }
