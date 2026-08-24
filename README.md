@@ -96,7 +96,7 @@ See [docs/quickstart.html](docs/quickstart.html) for copy-pasteable commands cov
 bash scripts/teardown.sh
 ```
 
-Runs `azd down --force --purge`, purges soft-deleted Cognitive Services, and optionally removes local `.azure/<env>` state.
+Runs `azd down --force --purge`, purges soft-deleted Cognitive Services and APIM, deletes the bot's Entra ID App Registration + Service Principal, and optionally removes local `.azure/<env>` state.
 
 ---
 

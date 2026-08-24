@@ -228,35 +228,29 @@ phase_2() {
 # Sets globals APP_ID / APP_PASSWORD and persists both to azd env.
 ensure_bot_app_registration() {
   local existing_app_id; existing_app_id=$(get_env BOT_APP_ID)
-  local existing_secret; existing_secret=$(get_env BOT_APP_SECRET)
 
-  if [ -n "$existing_app_id" ] && [ -n "$existing_secret" ]; then
-    # A cached ID in azd env only proves we created it once — not that it
-    # still exists in Entra ID. It can be deleted out-of-band (accidental
-    # `az ad app delete`, tenant cleanup) with zero trace in azd env, so
-    # verify (and self-heal via soft-delete restore + SP creation) before
-    # trusting it. See lib-bot-identity.sh for the full story.
-    info "Verifying cached App Registration $existing_app_id is still valid..."
-    if bot_identity_ensure "$existing_app_id"; then
-      ok "Bot App Registration already configured: $existing_app_id"
-      APP_ID="$existing_app_id"
-      APP_PASSWORD="$existing_secret"
-      return
+  # Deliberately does NOT reuse a cached BOT_APP_ID across install sessions —
+  # a fresh App Registration is created every time this runs. Bot Connector
+  # builds per-App-Registration routing state that has repeatedly corrupted
+  # after churn (repeated re-provision/reinstall cycles, manifest re-uploads,
+  # accidental out-of-band deletion) against the same ID — see
+  # lib-bot-identity.sh's header and [[project_teams_bot_debug]] for the
+  # history. A brand-new App Registration each session guarantees clean
+  # Connector state, at the cost of needing a fresh Teams app install too.
+  if [ -n "$existing_app_id" ]; then
+    info "Deleting previous session's App Registration ($existing_app_id) before creating a fresh one..."
+    if az ad app delete --id "$existing_app_id" 2>/dev/null; then
+      ok "Previous App Registration deleted (recoverable via Entra ID soft-delete for 30 days)."
+    else
+      warn "Could not delete previous App Registration $existing_app_id — it may already be gone."
     fi
-    warn "Cached App Registration is unrecoverable — creating a new one."
     azd env set BOT_APP_ID "" 2>/dev/null || true
     azd env set BOT_APP_SECRET "" 2>/dev/null || true
-    existing_app_id=""
-    existing_secret=""
   fi
 
   step_hdr "Teams Bot App Registration"
   echo ""
-  if [ -n "$existing_app_id" ]; then
-    warn "BOT_APP_ID found ($existing_app_id) but BOT_APP_SECRET is missing."
-    APP_ID="$existing_app_id"
-    APP_PASSWORD=$(ask "Client secret for App Registration $APP_ID")
-  elif ask_yn "Do you have an existing App Registration to reuse?" "n"; then
+  if ask_yn "Do you have an existing App Registration to reuse?" "n"; then
     APP_ID=$(ask "App Registration ID (appId)")
     APP_PASSWORD=$(ask "Client secret (password)")
   else
@@ -412,10 +406,13 @@ phase_4() {
 phase_5() {
   phase_hdr "5/6" "Teams App Install" "~5 min"
 
+  # RG is needed below regardless of whether APP_ID was already set by phase_4
+  # in the same run — resolve it unconditionally, not just on the --from 5 path.
+  [ -z "${RG:-}" ] && RG=$(get_env AZURE_RESOURCE_GROUP)
+  [ -z "$RG" ] && die "AZURE_RESOURCE_GROUP not set — complete Phase 3 first."
+
   # Resolve APP_ID if not set by phase_4 (--from 5 case)
   if [ -z "$APP_ID" ]; then
-    RG=$(get_env AZURE_RESOURCE_GROUP)
-    [ -z "$RG" ] && die "AZURE_RESOURCE_GROUP not set — complete Phase 3 first."
     API_APP=$(az containerapp list -g "$RG" \
       --query "[?tags.\"azd-service-name\"=='api'].name | [0]" -o tsv 2>/dev/null || true)
     APP_ID=$(az containerapp show -n "$API_APP" -g "$RG" \
@@ -435,6 +432,22 @@ phase_5() {
     [ -n "$api_app" ] && api_fqdn=$(az containerapp show -n "$api_app" -g "$RG" \
       --query "properties.configuration.ingress.fqdn" -o tsv 2>/dev/null || true)
   fi
+
+  # Publisher info shown in the Teams app's details pane. Cached in azd env so
+  # re-runs (--from 5) don't re-prompt. No org-specific default — this is a
+  # shared accelerator, not a Graviton Labs-only deployment, so whoever runs
+  # install.sh must supply their own organization's info here.
+  local dev_name; dev_name=$(get_env TEAMS_APP_DEVELOPER_NAME)
+  local dev_url; dev_url=$(get_env TEAMS_APP_DEVELOPER_URL)
+  if [ -z "$dev_name" ]; then
+    dev_name=$(ask "Publisher/organization name (shown in Teams app details)" "Your Organization")
+    dev_url=$(ask "Publisher website URL (also used for privacy/terms links)" "https://example.com")
+    azd env set TEAMS_APP_DEVELOPER_NAME "$dev_name"
+    azd env set TEAMS_APP_DEVELOPER_URL "$dev_url"
+  else
+    ok "Publisher info already in azd env: $dev_name ($dev_url)"
+  fi
+
   python3 - <<PYEOF
 import json, sys
 with open('teams-app/manifest.json') as f:
@@ -445,6 +458,10 @@ if d.get('bots'):
 fqdn = '${api_fqdn}'
 if fqdn:
     d['validDomains'] = [fqdn]
+d['developer']['name'] = '''${dev_name}'''
+d['developer']['websiteUrl'] = '''${dev_url}'''
+d['developer']['privacyUrl'] = '''${dev_url}'''
+d['developer']['termsOfUseUrl'] = '''${dev_url}'''
 with open('teams-app/manifest.json', 'w') as f:
     json.dump(d, f, indent=2)
     f.write('\n')
@@ -520,7 +537,7 @@ phase_6() {
     site_id="$stored_site_id"
     library="${stored_library:-Shared Documents}"
   else
-    local sp_host; sp_host=$(ask "SharePoint hostname" "gravitonlabs.sharepoint.com")
+    local sp_host; sp_host=$(ask "SharePoint hostname (e.g. contoso.sharepoint.com)")
     local sp_path; sp_path=$(ask "Site path (leave blank for root site)" "")
 
     local graph_url

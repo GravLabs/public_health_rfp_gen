@@ -1,6 +1,8 @@
 #!/bin/bash
 # Tears down all Azure resources for this environment.
-# Purges soft-deleted Key Vault and Cognitive Services so the next `azd up` starts clean.
+# Purges soft-deleted Key Vault, Cognitive Services, and APIM, and deletes the
+# bot's Entra ID App Registration + Service Principal (tenant-level objects
+# that survive azd down) so the next `azd up` starts clean.
 set -e
 
 echo "=== Teardown: Public Health RFP POC ==="
@@ -17,9 +19,10 @@ fi
 RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || echo "")
 AZURE_LOCATION=$(azd env get-value AZURE_LOCATION 2>/dev/null || echo "eastus")
 ENV_NAME=$(azd env get-value AZURE_ENV_NAME 2>/dev/null || echo "")
+BOT_APP_ID=$(azd env get-value BOT_APP_ID 2>/dev/null || echo "")
 
 echo ""
-echo "[1/3] Running azd down (deletes resource group + all resources)..."
+echo "[1/5] Running azd down (deletes resource group + all resources)..."
 # --force skips interactive confirmation, --purge purges soft-deleted KV and Cognitive Services
 azd down --force --purge
 
@@ -34,7 +37,7 @@ azd env set AZURE_LOCATION "$AZURE_LOCATION"
 echo "      ✓ AZURE_LOCATION restored: $AZURE_LOCATION (next 'azd up' can run unattended)"
 
 echo ""
-echo "[2/4] Purging any remaining soft-deleted Cognitive Services accounts..."
+echo "[2/5] Purging any remaining soft-deleted Cognitive Services accounts..."
 # azd --purge covers Key Vault; Cognitive Services soft-delete needs a separate purge
 if [ -n "$RESOURCE_GROUP" ] && [ -n "$AZURE_LOCATION" ]; then
   DELETED=$(az cognitiveservices account list-deleted \
@@ -53,7 +56,7 @@ if [ -n "$RESOURCE_GROUP" ] && [ -n "$AZURE_LOCATION" ]; then
 fi
 
 echo ""
-echo "[3/4] Purging any remaining soft-deleted API Management instances..."
+echo "[3/5] Purging any remaining soft-deleted API Management instances..."
 # API Management soft-deletes on removal too; azd --purge doesn't cover it.
 # Name/location come straight from the deleted-service list to avoid region
 # string-format mismatches (e.g. 'eastus' vs 'East US').
@@ -69,11 +72,39 @@ else
 fi
 
 echo ""
-echo "[4/4] Clearing local AZD environment state..."
+echo "[4/5] Deleting bot Entra ID App Registration + Service Principal..."
+# azd down only removes the resource group — the bot's Entra ID App
+# Registration and Service Principal are tenant-level objects outside any RG,
+# so they survive azd down untouched. Left behind, the next install.sh run
+# reuses this same App ID (BOT_APP_ID persists in azd env) against a stale
+# identity — if it's ever manually deleted out-of-band this becomes exactly
+# the orphaned-App-Registration bug documented in lib-bot-identity.sh's
+# header (bot installs but silently receives zero messages, invisible to our
+# own telemetry). Deleting it now guarantees the next provision starts from
+# a genuinely clean identity.
+if [ -n "$BOT_APP_ID" ]; then
+  if az ad app show --id "$BOT_APP_ID" &>/dev/null; then
+    echo "      Deleting App Registration $BOT_APP_ID (soft-deleted in Entra ID for 30 days, recoverable)..."
+    if az ad app delete --id "$BOT_APP_ID" 2>/dev/null; then
+      echo "      ✓ App Registration + Service Principal deleted"
+    else
+      echo "      ✗ Failed to delete App Registration $BOT_APP_ID — check permissions and remove manually if needed"
+    fi
+  else
+    echo "      App Registration $BOT_APP_ID already gone."
+  fi
+else
+  echo "      No BOT_APP_ID in azd env — nothing to delete."
+fi
+
+echo ""
+echo "[5/5] Clearing local AZD environment state..."
 if [ -d ".azure" ]; then
   echo ""
   echo "  WARNING: .azure/ holds saved secrets (BOT_APP_SECRET, SHAREPOINT_SITE_ID, etc.)."
-  echo "  If you delete it, install.sh will re-prompt for the bot client secret on next run."
+  echo "  Note: BOT_APP_SECRET is stale either way now that step [4/5] deleted the App"
+  echo "  Registration it belongs to — install.sh will need a fresh one regardless."
+  echo "  Keeping .azure/ still preserves SHAREPOINT_SITE_ID and other non-bot values."
   echo "  Answer 'no' unless you are fully resetting for a different tenant/org."
   echo ""
   read -r -p "Delete entire .azure/ directory? (yes/no) [no]: " del_local
