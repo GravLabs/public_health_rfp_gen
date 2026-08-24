@@ -1,8 +1,9 @@
 #!/bin/bash
 # Tears down all Azure resources for this environment.
-# Purges soft-deleted Key Vault, Cognitive Services, and APIM, and deletes the
-# bot's and Fabric pipeline's Entra ID App Registrations + Service Principals
-# (tenant-level objects that survive azd down) so the next `azd up` starts clean.
+# Purges soft-deleted Key Vault, Cognitive Services, and APIM, deletes the
+# bot's Entra ID App Registration + Service Principal, and deletes the Fabric
+# workspace — all tenant-level/Fabric-service objects that live outside the
+# Azure resource group `azd down` deletes, so they survive it untouched.
 set -e
 
 echo "=== Teardown: Public Health RFP POC ==="
@@ -20,7 +21,7 @@ RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || echo "")
 AZURE_LOCATION=$(azd env get-value AZURE_LOCATION 2>/dev/null || echo "eastus")
 ENV_NAME=$(azd env get-value AZURE_ENV_NAME 2>/dev/null || echo "")
 BOT_APP_ID=$(azd env get-value BOT_APP_ID 2>/dev/null || echo "")
-FABRIC_PIPELINE_APP_ID=$(azd env get-value FABRIC_PIPELINE_APP_ID 2>/dev/null || echo "")
+FABRIC_WORKSPACE_ID=$(azd env get-value FABRIC_WORKSPACE_ID 2>/dev/null || echo "")
 
 echo ""
 echo "[1/6] Running azd down (deletes resource group + all resources)..."
@@ -99,30 +100,30 @@ else
 fi
 
 echo ""
-echo "[5/6] Deleting Fabric pipeline Entra ID App Registration + Service Principal..."
-# Same tenant-level-object gap as the bot App Registration above — azd down
-# doesn't touch it. Deleting the app is sufficient cleanup: it invalidates any
-# possible auth as this identity immediately. We deliberately do NOT also try
-# to delete the site-level SharePoint permission grant this app was given
-# (POST /sites/{id}/permissions) — that requires re-running the interactive
-# Sites.FullControl.All device-code flow (see FabricClient.grant_site_permission
-# / fabric/setup.py's "SharePoint Connection Prerequisites"), which is a real
-# interactive burden for a teardown step. Once the app itself is gone, the
-# stale permission entry is inert — nothing can ever authenticate as an
-# App Registration that no longer exists — so it's harmless to leave behind.
-if [ -n "$FABRIC_PIPELINE_APP_ID" ]; then
-  if az ad app show --id "$FABRIC_PIPELINE_APP_ID" &>/dev/null; then
-    echo "      Deleting App Registration $FABRIC_PIPELINE_APP_ID (soft-deleted in Entra ID for 30 days, recoverable)..."
-    if az ad app delete --id "$FABRIC_PIPELINE_APP_ID" 2>/dev/null; then
-      echo "      ✓ App Registration + Service Principal deleted"
+echo "[5/6] Deleting Fabric workspace..."
+# The Fabric workspace (and everything in it — lakehouse, connections, the
+# SharePoint ingestion Copy Job) lives in the Fabric service plane, not as an
+# ARM resource inside the resource group — confirmed all session by using
+# api.fabric.microsoft.com, never management.azure.com, for any of it. azd
+# down's resource-group deletion never touches it; left behind, the next
+# fabric/setup.py run would either fail on a duplicate workspace name or
+# silently operate against stale leftover state.
+if [ -n "$FABRIC_WORKSPACE_ID" ]; then
+  FABRIC_TOKEN=$(az account get-access-token --resource "https://api.fabric.microsoft.com" --query accessToken -o tsv 2>/dev/null || echo "")
+  if [ -n "$FABRIC_TOKEN" ]; then
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+      -H "Authorization: Bearer $FABRIC_TOKEN" \
+      "https://api.fabric.microsoft.com/v1/workspaces/${FABRIC_WORKSPACE_ID}" 2>/dev/null || echo "000")
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "404" ]; then
+      echo "      ✓ Fabric workspace $FABRIC_WORKSPACE_ID deleted (or already gone)"
     else
-      echo "      ✗ Failed to delete App Registration $FABRIC_PIPELINE_APP_ID — check permissions and remove manually if needed"
+      echo "      ✗ Failed to delete Fabric workspace $FABRIC_WORKSPACE_ID (HTTP $HTTP_CODE) — remove manually via app.fabric.microsoft.com if needed"
     fi
   else
-    echo "      App Registration $FABRIC_PIPELINE_APP_ID already gone."
+    echo "      ✗ Could not acquire a Fabric API token — remove workspace $FABRIC_WORKSPACE_ID manually via app.fabric.microsoft.com"
   fi
 else
-  echo "      No FABRIC_PIPELINE_APP_ID in azd env — nothing to delete."
+  echo "      No FABRIC_WORKSPACE_ID in azd env — nothing to delete."
 fi
 
 echo ""

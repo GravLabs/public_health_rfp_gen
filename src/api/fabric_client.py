@@ -9,8 +9,10 @@ Fabric trial: https://learn.microsoft.com/fabric/get-started/fabric-trial
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
+import uuid
 from datetime import datetime
 from typing import Optional, Any
 
@@ -85,6 +87,67 @@ class FabricClient:
         return workspace_id
 
     @classmethod
+    async def provision_workspace_identity(cls, workspace_id: str, credential: Optional[DefaultAzureCredential] = None) -> dict:
+        """Provision the workspace's own Fabric-managed identity — needed for
+        the SharePoint connector's WorkspaceIdentity credential type (see
+        create_sharepoint_connection). Idempotent in effect: if one already
+        exists, returns it via a plain GET rather than erroring, since the
+        create call 400s with WorkspaceIdentityAlreadyExists on retry."""
+        cred = credential or DefaultAzureCredential()
+        token = get_bearer_token_provider(cred, FABRIC_SCOPE)()
+        headers = {"Authorization": f"Bearer {token}", "Content-Length": "0"}
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(f"{FABRIC_BASE}/workspaces/{workspace_id}/provisionIdentity", headers=headers)
+            if resp.status_code >= 400 and "WorkspaceIdentityAlreadyExists" not in resp.text:
+                resp.raise_for_status()
+            get_resp = await client.get(f"{FABRIC_BASE}/workspaces/{workspace_id}", headers={"Authorization": f"Bearer {token}"})
+            get_resp.raise_for_status()
+        identity = get_resp.json()["workspaceIdentity"]
+        log.info("Workspace %s identity: appId=%s spId=%s", workspace_id, identity["applicationId"], identity["servicePrincipalId"])
+        return identity
+
+    # Well-known Microsoft first-party resource + Sites.Selected app role IDs —
+    # stable, documented values, not worth a lookup call each run. Confirmed
+    # live this session. Sites.Read.All/ReadWrite.All do NOT satisfy the
+    # SharePoint connector (confirmed via a live 400) — must be Sites.Selected.
+    _GRAPH_RESOURCE_APP_ID = "00000003-0000-0000-c000-000000000000"
+    _SPO_RESOURCE_APP_ID = "00000003-0000-0ff1-ce00-000000000000"
+    _SITES_SELECTED_ROLE_GRAPH = "883ea226-0bf2-4a8f-9f9d-92c9162a727d"
+    _SITES_SELECTED_ROLE_SPO = "d13f72ca-a275-4b96-b789-48ebcc4da984"
+
+    @classmethod
+    async def grant_sharepoint_access_role(cls, principal_id: str, credential: Optional[DefaultAzureCredential] = None) -> None:
+        """Grant Sites.Selected (Graph + SharePoint Online application
+        permissions) to a service principal — step 1 of 2 for SharePoint
+        access (step 2 is grant_site_permission, the mandatory site-level
+        grant; Sites.Selected alone grants access to zero sites). Uses the
+        caller's own credential — ordinary Application.ReadWrite.All-level
+        directory access is enough for this step, unlike grant_site_permission
+        which needs a delegated Sites.FullControl.All token."""
+        cred = credential or DefaultAzureCredential()
+        token = get_bearer_token_provider(cred, "https://graph.microsoft.com/.default")()
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=30) as client:
+            for resource_app_id, role_id in (
+                (cls._GRAPH_RESOURCE_APP_ID, cls._SITES_SELECTED_ROLE_GRAPH),
+                (cls._SPO_RESOURCE_APP_ID, cls._SITES_SELECTED_ROLE_SPO),
+            ):
+                sp_resp = await client.get(
+                    f"https://graph.microsoft.com/v1.0/servicePrincipals(appId='{resource_app_id}')?$select=id",
+                    headers=headers,
+                )
+                sp_resp.raise_for_status()
+                resource_id = sp_resp.json()["id"]
+                assign_resp = await client.post(
+                    f"https://graph.microsoft.com/v1.0/servicePrincipals/{principal_id}/appRoleAssignments",
+                    headers=headers,
+                    json={"principalId": principal_id, "resourceId": resource_id, "appRoleId": role_id},
+                )
+                if assign_resp.status_code >= 400 and "already exist" not in assign_resp.text.lower():
+                    assign_resp.raise_for_status()
+        log.info("Granted Sites.Selected (Graph + SharePoint Online) to %s", principal_id)
+
+    @classmethod
     async def grant_workspace_role(
         cls, workspace_id: str, principal_id: str, role: str = "Contributor",
         principal_type: str = "ServicePrincipal", credential: Optional[DefaultAzureCredential] = None,
@@ -134,7 +197,7 @@ class FabricClient:
             )
             resp.raise_for_status()
             device = resp.json()
-            print(f"\n  To authorize, open {device['verification_uri']} and enter code: {device['user_code']}\n")
+            print(f"\n  To authorize, open {device['verification_uri']} and enter code: {device['user_code']}\n", flush=True)
 
             interval = device.get("interval", 5)
             elapsed = 0
@@ -180,6 +243,50 @@ class FabricClient:
             resp.raise_for_status()
         log.info("Granted site %s read access to app %s", site_id, app_client_id)
         return resp.json()
+
+    @classmethod
+    async def create_sharepoint_connection(
+        cls, display_name: str, sharepoint_site_url: str, credential: Optional[DefaultAzureCredential] = None,
+    ) -> str:
+        """Create a Fabric Connection to a SharePoint site, for use as a Copy
+        Job/pipeline source. Uses WorkspaceIdentity credentials — NOT
+        ServicePrincipal, which Microsoft's own docs confirm is unsupported
+        for Copy (only Dataflow Gen2): https://learn.microsoft.com/fabric/
+        data-factory/connector-sharepoint-online-list ("Service Principal:
+        n/a" for Copy). Confirmed live: a standalone App Registration with
+        ServicePrincipal credentials and fully correct Sites.Selected + site
+        permissions still 400s with IncorrectCredentials; WorkspaceIdentity
+        with the identical permissions succeeds. Requires the *workspace's*
+        identity (see grant_site_permission) to already have that site grant,
+        not a separate app.
+        """
+        cred = credential or DefaultAzureCredential()
+        token = get_bearer_token_provider(cred, FABRIC_SCOPE)()
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{FABRIC_BASE}/connections",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json={
+                    "connectivityType": "ShareableCloud",
+                    "displayName": display_name,
+                    "connectionDetails": {
+                        "type": "SharePoint",
+                        "creationMethod": "SharePointList",
+                        "parameters": [{"dataType": "Text", "name": "sharePointSiteUrl", "value": sharepoint_site_url}],
+                    },
+                    "privacyLevel": "Organizational",
+                    "credentialDetails": {
+                        "singleSignOnType": "None",
+                        "connectionEncryption": "Encrypted",
+                        "skipTestConnection": False,
+                        "credentials": {"credentialType": "WorkspaceIdentity"},
+                    },
+                },
+            )
+            resp.raise_for_status()
+        connection_id = resp.json()["id"]
+        log.info("Fabric SharePoint connection created: %s (%s)", display_name, connection_id)
+        return connection_id
 
     @classmethod
     async def find_trial_capacity_id(cls, credential: Optional[DefaultAzureCredential] = None) -> str:
@@ -287,62 +394,121 @@ class FabricClient:
         file_name = f"{rfp_id}_{draft_id}{suffix}.md"
         return await self.upload_rfp_document(file_name, content_md.encode(), folder="generated-drafts")
 
-    # ── Fabric Pipeline ───────────────────────────────────────────────────────
+    # ── Fabric Ingestion (Copy Job) ──────────────────────────────────────────────
 
     @classmethod
     async def provision_ingestion_pipeline(
         cls,
         workspace_id: str,
         pipeline_name: str,
-        sharepoint_site_id: str,
+        sharepoint_connection_id: str,
+        sharepoint_folder_path: str,
         lakehouse_id: str,
+        destination_folder_path: str = "rfp-corpus",
         credential: Optional[DefaultAzureCredential] = None,
     ) -> str:
-        """Create a Fabric Data Pipeline for SharePoint → OneLake ingestion."""
+        """Create a Fabric CopyJob for SharePoint → OneLake file ingestion.
+
+        A standalone CopyJob item (Fabric's newer, simpler alternative to a
+        DataPipeline wrapping an inline Copy activity) — confirmed live this
+        works and runs on its own; no wrapping DataPipeline/InvokeCopyJob
+        activity is needed. Uses Binary format on both source and
+        destination — this is a byte-for-byte file copy (preserves .docx,
+        .pdf, .md, anything, unmodified), not DelimitedText/JSON/Avro/ORC/
+        Parquet, which would try to parse file contents as structured/tabular
+        data and corrupt non-tabular files. Binary does not appear in the
+        Fabric portal's own "File format" dropdown for this item type
+        (misleadingly suggests it's unsupported) but is confirmed live via a
+        real completed run + byte-for-byte diff against the source file —
+        genuinely works despite the UI not listing it as an option.
+
+        `sharepoint_connection_id` must come from create_sharepoint_connection()
+        (WorkspaceIdentity credentials) — see that method's docstring for why
+        ServicePrincipal doesn't work here. Runs in jobMode "CDC" (Change Data
+        Capture) — an ongoing incremental sync, not a one-time copy; Fabric
+        schedules follow-up runs automatically.
+        """
         cred = credential or DefaultAzureCredential()
         token = get_bearer_token_provider(cred, FABRIC_SCOPE)()
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
-        pipeline_def = {
-            "displayName": pipeline_name,
-            "type": "DataPipeline",
-            "definition": {
-                "parts": [{
-                    "type": "pipeline",
-                    "payload": json.dumps({
-                        "name": pipeline_name,
-                        "properties": {
-                            "activities": [{
-                                "name": "CopySharePointToLakehouse",
-                                "type": "Copy",
-                                "typeProperties": {
-                                    "source": {
-                                        "type": "SharePointOnlineListSource",
-                                        "siteUrl": f"https://graph.microsoft.com/v1.0/sites/{sharepoint_site_id}",
-                                        "listName": "RFP Corpus"
-                                    },
-                                    "sink": {
-                                        "type": "LakehouseTableSink",
-                                        "workspaceId": workspace_id,
-                                        "artifactId": lakehouse_id,
-                                        "rootFolder": "Files/rfp-corpus"
-                                    }
+        copyjob_content = {
+            "properties": {
+                "jobMode": "CDC",
+                "source": {
+                    "type": "Binary",
+                    "connectionSettings": {
+                        "type": "SharePointOnlineFile",
+                        "externalReferences": {"connection": sharepoint_connection_id},
+                    },
+                },
+                "destination": {
+                    "type": "Binary",
+                    "connectionSettings": {
+                        "type": "Lakehouse",
+                        "typeProperties": {
+                            "workspaceId": workspace_id,
+                            "artifactId": lakehouse_id,
+                            "rootFolder": "Files",
+                        },
+                    },
+                },
+                "policy": {"timeout": "0.12:00:00", "retry": 0},
+            },
+            "activities": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "properties": {
+                        "source": {
+                            "datasetSettings": {
+                                "location": {
+                                    "type": "SharePointOnlineFileStoreLocation",
+                                    "folderPath": sharepoint_folder_path,
                                 }
-                            }]
-                        }
-                    })
-                }]
-            }
+                            },
+                            "changeDataSettings": {"readMethod": "SnapshotPlusIncremental"},
+                            "storeSettings": {"recursive": True},
+                        },
+                        "destination": {
+                            "datasetSettings": {
+                                "location": {"type": "LakehouseLocation", "folderPath": destination_folder_path}
+                            },
+                            "storeSettings": {"copyBehavior": "PreserveHierarchy"},
+                        },
+                        "enableStaging": False,
+                    },
+                }
+            ],
+        }
+        platform_content = {
+            "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+            "metadata": {"type": "CopyJob", "displayName": pipeline_name},
+            "config": {"version": "2.0", "logicalId": str(uuid.uuid4())},
+        }
+
+        item_def = {
+            "displayName": pipeline_name,
+            "type": "CopyJob",
+            "definition": {
+                "parts": [
+                    {
+                        "path": "copyjob-content.json",
+                        "payload": base64.b64encode(json.dumps(copyjob_content).encode()).decode(),
+                        "payloadType": "InlineBase64",
+                    },
+                    {
+                        "path": ".platform",
+                        "payload": base64.b64encode(json.dumps(platform_content).encode()).decode(),
+                        "payloadType": "InlineBase64",
+                    },
+                ]
+            },
         }
 
         async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                f"{FABRIC_BASE}/workspaces/{workspace_id}/items",
-                headers=headers,
-                json=pipeline_def
-            )
+            resp = await client.post(f"{FABRIC_BASE}/workspaces/{workspace_id}/items", headers=headers, json=item_def)
             resp.raise_for_status()
 
         pipeline_id = resp.json()["id"]
-        log.info("Fabric Pipeline created: %s (%s)", pipeline_name, pipeline_id)
+        log.info("Fabric CopyJob created: %s (%s)", pipeline_name, pipeline_id)
         return pipeline_id
