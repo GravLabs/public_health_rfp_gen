@@ -9,6 +9,15 @@ class GateDecision(str, Enum):
     FAIL = "FAIL"
 
 
+class DraftStatus(str, Enum):
+    """Human review status — independent of GateDecision. A draft can be
+    gate-FAIL and still PENDING (waiting on an edit), or gate-PASS and
+    REJECTED (a human overrode the gate)."""
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class RfpRequest(BaseModel):
     program_area: str
     federal_sponsor: str
@@ -75,6 +84,25 @@ class GenerateAndEvaluateResponse(BaseModel):
     draft: RfpDraft
     evaluation: EvaluationResult
     gate_decision: GateDecision
+
+
+# ── Human Review (reject / edit) ─────────────────────────────────────────────────
+
+class RejectDraftRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+class EditDraftRequest(BaseModel):
+    sections: dict[str, str]  # partial update — only the keys being changed
+
+
+class DraftStatusResponse(BaseModel):
+    draft_id: str
+    rfp_id: str
+    status: DraftStatus
+    gate_decision: Optional[GateDecision] = None
+    reason: Optional[str] = None
+    sections: Optional[dict[str, str]] = None
 
 
 class HealthResponse(BaseModel):

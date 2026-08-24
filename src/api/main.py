@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import httpx
+from opentelemetry import trace
 from azure.identity import DefaultAzureCredential
 from botbuilder.core import BotFrameworkAdapter, BotFrameworkAdapterSettings
 from botbuilder.schema import Activity
@@ -31,6 +32,7 @@ from models import (
     ReviewRequest, ReviewResult, ReviewScore,
     BudgetAuditRequest, BudgetAuditResult, BudgetLineItem,
     RegulatoryWatchResult, RegulatoryAlert,
+    DraftStatus, RejectDraftRequest, EditDraftRequest, DraftStatusResponse,
 )
 from sharepoint_client import SharePointClient
 from fabric_client import FabricClient
@@ -69,10 +71,6 @@ _foundry_project_client: Optional[FoundryProjectClient] = None
 async def lifespan(app: FastAPI):
     global _sp_client, _fabric_client, _budget_monitor, _foundry_project_client
 
-    # AI Foundry tracing — must be first
-    FoundryTracer.setup()
-    setup_observability(app)
-
     if SHAREPOINT_SITE_ID:
         _sp_client = SharePointClient(SHAREPOINT_SITE_ID, credential)
         log.info("SharePoint client initialized for site: %s", SHAREPOINT_SITE_ID)
@@ -92,6 +90,19 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Must run synchronously right here, not inside the async `lifespan` handler above.
+# FastAPIInstrumentor.instrument_app(app) has to wrap the app before Starlette's
+# middleware stack is built/frozen; deferring it into lifespan's startup event
+# (which fires after the app object — and its middleware wiring — already exist)
+# means the OTel ASGI middleware never actually gets inserted into the request
+# path. Confirmed empirically: with setup_observability() called from lifespan,
+# the API service never sent a single AppRequests/AppDependencies/AppTraces row
+# to Log Analytics, for any endpoint, ever — only the .NET orchestrator (whose
+# ASP.NET Core auto-instrumentation isn't subject to this ordering issue) showed
+# up. AI Foundry tracing kept first, matching the original ordering intent.
+FoundryTracer.setup()
+setup_observability(app)
 
 # In-memory draft cache keyed by draft_id — populated after gate PASS, used by /export
 _draft_cache: dict[str, dict] = {}
@@ -195,8 +206,27 @@ async def generate_and_evaluate(request: RfpRequest) -> GenerateAndEvaluateRespo
     evaluation = await _run_evaluation(draft, request)
     draft = await _persist_draft(draft, request, evaluation)
 
-    if evaluation.gate_decision == GateDecision.PASS:
-        _draft_cache[draft.draft_id] = {"rfp_id": draft.rfp_id, "sections": draft.sections}
+    session_tracker.record_generation(draft.token_usage.prompt_tokens, draft.token_usage.completion_tokens)
+    span = trace.get_current_span()
+    record_generation_span(span, draft.draft_id, draft.rfp_id, draft.program_area,
+                            draft.token_usage.prompt_tokens, draft.token_usage.completion_tokens,
+                            evaluation.gate_decision.value)
+    record_evaluation_span(span, evaluation.scores.model_dump(), evaluation.failure_reasons)
+
+    # Cached regardless of gate outcome — a FAIL draft is exactly what a human
+    # would want to inspect and edit via /drafts/{id}/edit.
+    _draft_cache[draft.draft_id] = {
+        "rfp_id": draft.rfp_id,
+        "sections": draft.sections,
+        "program_area": draft.program_area,
+        "federal_sponsor": draft.federal_sponsor,
+        "generated_at": draft.generated_at,
+        "token_usage": draft.token_usage,
+        "request": request,
+        "status": DraftStatus.PENDING,
+        "gate_decision": evaluation.gate_decision,
+        "reject_reason": None,
+    }
 
     return GenerateAndEvaluateResponse(
         draft=draft,
@@ -259,8 +289,29 @@ async def generate_stream(request: RfpRequest):
             evaluation = await _run_evaluation(draft, request)
             draft = await _persist_draft(draft, request, evaluation)
 
-            if evaluation.gate_decision == GateDecision.PASS:
-                _draft_cache[draft.draft_id] = {"rfp_id": draft.rfp_id, "sections": sections}
+            # NOTE: token_usage is hardcoded to zero on this streaming path (the
+            # orchestrator's /generate/stream NDJSON doesn't emit token counts per
+            # section today), so cost telemetry here will under-report vs the
+            # non-streaming /generate-and-evaluate path. Known gap, not fixed here.
+            session_tracker.record_generation(draft.token_usage.prompt_tokens, draft.token_usage.completion_tokens)
+            span = trace.get_current_span()
+            record_generation_span(span, draft.draft_id, draft.rfp_id, draft.program_area,
+                                    draft.token_usage.prompt_tokens, draft.token_usage.completion_tokens,
+                                    evaluation.gate_decision.value)
+            record_evaluation_span(span, evaluation.scores.model_dump(), evaluation.failure_reasons)
+
+            _draft_cache[draft.draft_id] = {
+                "rfp_id": draft.rfp_id,
+                "sections": sections,
+                "program_area": draft.program_area,
+                "federal_sponsor": draft.federal_sponsor,
+                "generated_at": draft.generated_at,
+                "token_usage": draft.token_usage,
+                "request": request,
+                "status": DraftStatus.PENDING,
+                "gate_decision": evaluation.gate_decision,
+                "reject_reason": None,
+            }
 
             yield json.dumps({
                 "type": "gate_result",
@@ -303,7 +354,77 @@ async def export_draft(draft_id: str):
         log.exception("SharePoint upload failed for draft %s", draft_id)
         raise HTTPException(status_code=500, detail=f"SharePoint upload failed: {exc}") from exc
 
+    # Only mark APPROVED once the upload actually succeeds — a failed upload
+    # leaves the draft PENDING so retry/reject both stay meaningful.
+    cached["status"] = DraftStatus.APPROVED
+
     return {"sharepoint_url": sp_url, "draft_id": draft_id, "rfp_id": cached["rfp_id"]}
+
+
+@app.get("/drafts/{draft_id}", response_model=DraftStatusResponse, summary="Get a cached draft's current status")
+async def get_draft(draft_id: str) -> DraftStatusResponse:
+    """Look up a cached draft's review status, gate decision, and current sections."""
+    cached = _draft_cache.get(draft_id)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Draft not found")
+
+    return DraftStatusResponse(
+        draft_id=draft_id,
+        rfp_id=cached["rfp_id"],
+        status=cached["status"],
+        gate_decision=cached.get("gate_decision"),
+        reason=cached.get("reject_reason"),
+        sections=cached["sections"],
+    )
+
+
+@app.post("/drafts/{draft_id}/reject", response_model=DraftStatusResponse, summary="Reject a draft")
+async def reject_draft(draft_id: str, body: RejectDraftRequest = RejectDraftRequest()) -> DraftStatusResponse:
+    """Mark a cached draft as rejected. Does not touch SharePoint/Fabric — a
+    reject after approve does not retract an already-uploaded SharePoint copy."""
+    cached = _draft_cache.get(draft_id)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Draft not found")
+
+    cached["status"] = DraftStatus.REJECTED
+    cached["reject_reason"] = body.reason
+
+    return DraftStatusResponse(
+        draft_id=draft_id,
+        rfp_id=cached["rfp_id"],
+        status=cached["status"],
+        gate_decision=cached.get("gate_decision"),
+        reason=cached["reject_reason"],
+    )
+
+
+@app.post("/drafts/{draft_id}/edit", response_model=EvaluationResult, summary="Edit a draft's sections and re-evaluate")
+async def edit_draft(draft_id: str, body: EditDraftRequest) -> EvaluationResult:
+    """Apply a partial section edit to a cached draft and re-run the evaluation
+    gate against it. Resets status to PENDING — an edit un-decides the draft,
+    including one that was already approved (this does not re-export or
+    retract the earlier SharePoint copy)."""
+    cached = _draft_cache.get(draft_id)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Draft not found")
+
+    cached["sections"].update(body.sections)
+
+    draft = RfpDraft(
+        draft_id=draft_id,
+        rfp_id=cached["rfp_id"],
+        program_area=cached["program_area"],
+        federal_sponsor=cached["federal_sponsor"],
+        generated_at=cached["generated_at"],
+        sections=cached["sections"],
+        token_usage=cached["token_usage"],
+    )
+    evaluation = await _run_evaluation(draft, cached["request"])
+
+    cached["gate_decision"] = evaluation.gate_decision
+    cached["status"] = DraftStatus.PENDING
+
+    return evaluation
 
 
 @app.get("/sharepoint/corpus", summary="List SharePoint corpus files")
