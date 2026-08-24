@@ -47,8 +47,18 @@ class FabricClient:
     # ── Workspace and Lakehouse setup ─────────────────────────────────────────
 
     @classmethod
-    async def provision_workspace(cls, workspace_name: str, credential: Optional[DefaultAzureCredential] = None) -> str:
-        """Create a Fabric workspace. Returns workspace ID."""
+    async def provision_workspace(
+        cls, workspace_name: str, credential: Optional[DefaultAzureCredential] = None,
+        capacity_id: Optional[str] = None,
+    ) -> str:
+        """Create a Fabric workspace and assign it to a capacity. Returns workspace ID.
+
+        A workspace with no capacity assigned cannot host items (lakehouses,
+        notebooks, etc.) — the Fabric API 403s on item creation with no useful
+        error body. capacity_id must be resolved by the caller (see
+        `find_trial_capacity_id`) since a tenant can have multiple capacities
+        and there's no single correct default to assume here.
+        """
         cred = credential or DefaultAzureCredential()
         token = get_bearer_token_provider(cred, FABRIC_SCOPE)()
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
@@ -59,9 +69,64 @@ class FabricClient:
                 json={"displayName": workspace_name, "description": "Public Health RFP Generation POC"}
             )
             resp.raise_for_status()
-        workspace_id = resp.json()["id"]
-        log.info("Fabric workspace created: %s (%s)", workspace_name, workspace_id)
+            workspace_id = resp.json()["id"]
+            log.info("Fabric workspace created: %s (%s)", workspace_name, workspace_id)
+
+            if capacity_id:
+                assign_resp = await client.post(
+                    f"{FABRIC_BASE}/workspaces/{workspace_id}/assignToCapacity",
+                    headers=headers,
+                    json={"capacityId": capacity_id}
+                )
+                assign_resp.raise_for_status()
+                log.info("Fabric workspace %s assigned to capacity %s", workspace_id, capacity_id)
+
         return workspace_id
+
+    @classmethod
+    async def grant_workspace_role(
+        cls, workspace_id: str, principal_id: str, role: str = "Contributor",
+        principal_type: str = "ServicePrincipal", credential: Optional[DefaultAzureCredential] = None,
+    ) -> None:
+        """Grant a principal (e.g. the API's managed identity) a Fabric workspace
+        role. Fabric workspace access is Fabric-native role-based (Admin/Member/
+        Contributor/Viewer), entirely separate from Azure RBAC — an Azure
+        'Contributor' role on the resource group does not grant OneLake access.
+        Without this, every write (write_draft_to_lakehouse, write_eval_record)
+        403s at the OneLake layer regardless of any Azure-side permissions."""
+        cred = credential or DefaultAzureCredential()
+        token = get_bearer_token_provider(cred, FABRIC_SCOPE)()
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{FABRIC_BASE}/workspaces/{workspace_id}/roleAssignments",
+                headers=headers,
+                json={"principal": {"id": principal_id, "type": principal_type}, "role": role}
+            )
+            resp.raise_for_status()
+        log.info("Fabric workspace %s: granted %s role to %s %s", workspace_id, role, principal_type, principal_id)
+
+    @classmethod
+    async def find_trial_capacity_id(cls, credential: Optional[DefaultAzureCredential] = None) -> str:
+        """Find an active Fabric trial capacity (sku starting with 'FT') in the tenant.
+        Raises if none or more than one is found — ambiguous cases need an explicit --capacity-id."""
+        cred = credential or DefaultAzureCredential()
+        token = get_bearer_token_provider(cred, FABRIC_SCOPE)()
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(f"{FABRIC_BASE}/capacities", headers=headers)
+            resp.raise_for_status()
+        capacities = resp.json().get("value", [])
+        trials = [c for c in capacities if c.get("sku", "").startswith("FT") and c.get("state") == "Active"]
+        if not trials:
+            raise RuntimeError(
+                f"No active Fabric trial capacity found among {len(capacities)} capacities. "
+                "Activate one at https://app.fabric.microsoft.com, or pass --capacity-id explicitly."
+            )
+        if len(trials) > 1:
+            ids = ", ".join(f"{c['displayName']} ({c['id']})" for c in trials)
+            raise RuntimeError(f"Multiple active trial capacities found — pass --capacity-id explicitly: {ids}")
+        return trials[0]["id"]
 
     @classmethod
     async def provision_lakehouse(cls, workspace_id: str, lakehouse_name: str, credential: Optional[DefaultAzureCredential] = None) -> str:
@@ -82,15 +147,27 @@ class FabricClient:
 
     # ── OneLake file operations ───────────────────────────────────────────────
 
-    async def upload_rfp_document(self, file_name: str, content: bytes, folder: str = "Files/rfp-corpus") -> str:
-        """Upload an RFP document to OneLake via ADLS Gen2-compatible API."""
-        path = f"{self._workspace_id}/{self._lakehouse_id}/{folder}/{file_name}"
+    async def upload_rfp_document(self, file_name: str, content: bytes, folder: str = "rfp-corpus") -> str:
+        """Upload an RFP document to OneLake via ADLS Gen2-compatible API.
+
+        `folder` is relative to the Lakehouse's own reserved `Files/` root —
+        do not include a leading "Files/" here, the OneLake path already is
+        `{workspace}/{lakehouse}/Files/...`; prepending it again produces a
+        redundant `Files/Files/...` nesting (confirmed by listing the live
+        lakehouse after a real write)."""
+        path = f"{self._workspace_id}/{self._lakehouse_id}/Files/{folder}/{file_name}"
         url = f"{ONELAKE_BASE}/{path}"
 
         async with httpx.AsyncClient(timeout=120) as client:
-            # Create file
+            # Create file. `resource=file` must be a query param, not a header —
+            # sending it as `x-ms-resource` (the previous code here) gets a
+            # generic "mandatory header not specified" 400 with no detail on
+            # which header, confirmed against the live OneLake DFS endpoint.
+            # The empty-body create/flush calls also need an explicit
+            # Content-Length: 0 — httpx does not add it automatically.
             create_resp = await client.put(
-                url, headers={**self._onelake_headers(), "x-ms-resource": "file"}
+                f"{url}?resource=file",
+                headers={**self._onelake_headers(), "Content-Length": "0"},
             )
             create_resp.raise_for_status()
 
@@ -105,11 +182,11 @@ class FabricClient:
             # Flush
             flush_resp = await client.patch(
                 f"{url}?action=flush&position={len(content)}",
-                headers=self._onelake_headers()
+                headers={**self._onelake_headers(), "Content-Length": "0"},
             )
             flush_resp.raise_for_status()
 
-        onelake_path = f"onelake://{self._workspace_id}/{self._lakehouse_id}/{folder}/{file_name}"
+        onelake_path = f"onelake://{self._workspace_id}/{self._lakehouse_id}/Files/{folder}/{file_name}"
         log.info("Uploaded to OneLake: %s", onelake_path)
         return onelake_path
 
@@ -119,12 +196,12 @@ class FabricClient:
         file_name = f"eval_{eval_data.get('draft_id', 'unknown')}_{timestamp}.json"
         content = json.dumps(eval_data, indent=2).encode()
 
-        return await self.upload_rfp_document(file_name, content, folder="Files/eval-results")
+        return await self.upload_rfp_document(file_name, content, folder="eval-results")
 
     async def write_draft_to_lakehouse(self, draft_id: str, rfp_id: str, content_md: str) -> str:
         """Write a generated RFP draft to OneLake for archival and Power BI lineage."""
         file_name = f"{rfp_id}_{draft_id}.md"
-        return await self.upload_rfp_document(file_name, content_md.encode(), folder="Files/generated-drafts")
+        return await self.upload_rfp_document(file_name, content_md.encode(), folder="generated-drafts")
 
     # ── AI Skill ──────────────────────────────────────────────────────────────
 

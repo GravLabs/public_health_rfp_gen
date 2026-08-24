@@ -131,9 +131,31 @@ FOUNDRY_HUB=$(azd env get-value AZURE_AI_FOUNDRY_HUB_NAME)
 echo "      ✓ AI Foundry vars: $FOUNDRY_PROJECT_NAME @ $FOUNDRY_ENDPOINT"
 
 echo "[5/8] Fabric setup"
+# Like SharePoint (step 7 below), FABRIC_WORKSPACE_ID/FABRIC_LAKEHOUSE_ID are
+# not provisioned by Bicep — they only ever get set by fabric/setup.py running
+# against a workspace outside this template's scope. Without this re-wiring,
+# a re-provision would leave them cached in azd env but silently missing from
+# the new container, so write_to_fabric writes would just no-op with no error.
 FABRIC_WORKSPACE=$(azd env get-value FABRIC_WORKSPACE_ID 2>/dev/null) || FABRIC_WORKSPACE=""
 if [ -n "$FABRIC_WORKSPACE" ]; then
-  echo "      Fabric workspace already provisioned: $FABRIC_WORKSPACE"
+  FABRIC_LAKEHOUSE=$(azd env get-value FABRIC_LAKEHOUSE_ID 2>/dev/null || echo "")
+  RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || echo "")
+  API_APP_NAME=$(az containerapp list -g "$RESOURCE_GROUP" \
+    --query "[?tags.\"azd-service-name\"=='api'].name | [0]" -o tsv 2>/dev/null || echo "")
+  API_IMAGE=$(az containerapp show -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
+    --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
+  if [ -n "$API_APP_NAME" ] && [ -n "$API_IMAGE" ]; then
+    az containerapp update -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
+      --image "$API_IMAGE" \
+      --set-env-vars "FABRIC_WORKSPACE_ID=${FABRIC_WORKSPACE}" "FABRIC_LAKEHOUSE_ID=${FABRIC_LAKEHOUSE}" \
+      --revision-suffix "fabricinit$(date +%s)" \
+      --output none \
+      && echo "      ✓ Fabric env vars set on API container: $FABRIC_WORKSPACE" \
+      || { echo "      ✗ Failed to set Fabric env vars on API container"; FAILED=1; }
+  else
+    echo "      ✗ Could not resolve API container app — skipping Fabric env vars"
+    FAILED=1
+  fi
 else
   echo "      ℹ Fabric not provisioned yet."
   echo "      To provision, run:"
