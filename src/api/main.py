@@ -112,6 +112,42 @@ _draft_cache: dict[str, dict] = {}
 _last_draft_id: Optional[str] = None
 
 
+def _pad_ragged_tables(text: str) -> str:
+    """The orchestrator's LLM sometimes emits tables whose data rows have more
+    columns than the header — e.g. a 2-column "Criterion | Points" header
+    over 3-column rows with a trailing description cell (seen in
+    evaluation_criteria). GFM table parsers use the header to decide column
+    count and silently DROP the extra cells rather than erroring, which for
+    that case means the actual criteria descriptions vanish from the
+    rendered preview. Padding the header/separator to match the widest row
+    keeps that content instead — the same fix sharepoint_client.py's
+    _render_md_table() already applies for the Word export path via
+    `col_count = max(len(r) for r in rows)`."""
+    lines = text.splitlines()
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        if lines[i].strip().startswith("|"):
+            block = []
+            while i < len(lines) and lines[i].strip().startswith("|"):
+                block.append(lines[i])
+                i += 1
+            col_counts = [len(ln.strip().strip("|").split("|")) for ln in block]
+            max_cols = max(col_counts)
+            if len(block) >= 2 and col_counts[0] < max_cols:
+                header_cells = block[0].strip().strip("|").split("|")
+                header_cells += ["Details"] * (max_cols - len(header_cells))
+                block[0] = "|" + "|".join(header_cells) + "|"
+                sep_cells = block[1].strip().strip("|").split("|")
+                sep_cells += ["---"] * (max_cols - len(sep_cells))
+                block[1] = "|" + "|".join(sep_cells) + "|"
+            out.extend(block)
+        else:
+            out.append(lines[i])
+            i += 1
+    return "\n".join(out)
+
+
 def _markdown_to_html(text: str) -> str:
     """Section text is markdown (the orchestrator's LLM output, same content
     SharePointClient.draft_to_docx renders as Word) -- but it can also contain
@@ -122,6 +158,7 @@ def _markdown_to_html(text: str) -> str:
     when this page is opened as the pinned Teams tab."""
     import markdown
     from html import escape
+    text = _pad_ragged_tables(text)
     return markdown.markdown(escape(text, quote=False), extensions=["tables"])
 
 
@@ -579,8 +616,8 @@ async def edit_draft(draft_id: str, body: EditDraftRequest) -> EvaluationResult:
 async def edit_draft_ai(draft_id: str, body: AiEditDraftRequest) -> EvaluationResult:
     """Like /edit, but the caller supplies an instruction instead of the
     replacement text — an LLM rewrites the named section to satisfy it. Used
-    by both the card's 'AI Edit' action and a typed chat instruction (e.g.
-    "edit the eligibility section to mention CLIA accreditation")."""
+    by a typed chat instruction (e.g. "edit the eligibility section to
+    mention CLIA accreditation")."""
     cached = _draft_cache.get(draft_id)
     if not cached:
         raise HTTPException(status_code=404, detail="Draft not found")

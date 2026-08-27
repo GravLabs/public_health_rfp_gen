@@ -235,37 +235,6 @@ def _result_card(event: dict, subtitle: str) -> dict[str, Any]:
                     }],
                 },
             })
-            actions.append({
-                "type": "Action.ShowCard",
-                "title": "🤖 AI Edit",
-                "card": {
-                    "type": "AdaptiveCard",
-                    "body": [
-                        {
-                            "type": "Input.ChoiceSet",
-                            "id": "section_key",
-                            "label": "Section",
-                            "value": next(iter(sections)),
-                            "choices": [
-                                {"title": key.replace("_", " ").title(), "value": key}
-                                for key in sections
-                            ],
-                        },
-                        {
-                            "type": "Input.Text",
-                            "id": "instruction",
-                            "label": "What should change?",
-                            "isMultiline": True,
-                            "placeholder": "e.g. add a mention of CLIA accreditation requirements",
-                        },
-                    ],
-                    "actions": [{
-                        "type": "Action.Submit",
-                        "title": "Rewrite Section",
-                        "data": {"action": "ai_edit_rfp_section", "draft_id": draft_id},
-                    }],
-                },
-            })
 
     return {
         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
@@ -573,7 +542,7 @@ async def _handle_chat_section_edit(turn_context: TurnContext, section_key: str,
 # ── Bot handler ─────────────────────────────────────────────────────────────────
 
 async def _apply_ai_edit(turn_context: TurnContext, draft_id: str, section_key: str, instruction: str) -> None:
-    """Shared by the card's 'AI Edit' action and a typed chat instruction —
+    """Called from a typed chat instruction (via _handle_chat_section_edit) —
     rewrites one section from a natural-language instruction via
     POST /drafts/{id}/edit/ai, then sends the same result card the manual
     Edit Section flow uses."""
@@ -709,15 +678,6 @@ class RfpBotHandler(ActivityHandler):
                 )
             except Exception as e:
                 await turn_context.send_activity(f"Edit failed: {e}")
-            return
-
-        if isinstance(value, dict) and value.get("action") == "ai_edit_rfp_section":
-            await _apply_ai_edit(
-                turn_context,
-                value.get("draft_id", ""),
-                value.get("section_key", ""),
-                value.get("instruction", ""),
-            )
             return
 
         # Check for file attachments — route directly to proposal review.

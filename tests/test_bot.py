@@ -286,9 +286,8 @@ def test_result_card_with_sections_offers_edit_action():
               "scores": {}, "failure_reasons": [], "rfp_id": "RFP-1",
               "sections": {"background": "Some background text."}}
     card = bot._result_card(event, "subtitle")
-    show_card_actions = {a["card"]["actions"][0]["data"]["action"]
-                          for a in card["actions"] if a["type"] == "Action.ShowCard"}
-    assert show_card_actions == {"edit_rfp_section", "ai_edit_rfp_section"}
+    assert card["actions"][-1]["type"] == "Action.ShowCard"
+    assert card["actions"][-1]["card"]["actions"][0]["data"] == {"action": "edit_rfp_section", "draft_id": "d1"}
 
 
 def test_result_card_shows_edited_section_label():
@@ -416,7 +415,7 @@ async def test_approve_rfp_action_export_failure_reported():
     assert "SharePoint upload failed" in _text_of(ctx.sent[-1])
 
 
-# ── AI Edit (card action + typed chat instruction) ────────────────────────────────
+# ── AI Edit (typed chat instruction — no card action; removed per feedback) ───────
 
 def _ai_edit_routes(draft_id="d1"):
     return {
@@ -434,13 +433,10 @@ def _ai_edit_routes(draft_id="d1"):
 
 
 @pytest.mark.asyncio
-async def test_ai_edit_card_action_success():
+async def test_apply_ai_edit_success():
     with patch("bot.httpx.AsyncClient", side_effect=_client_factory(_ai_edit_routes())):
-        ctx = FakeTurnContext(value={
-            "action": "ai_edit_rfp_section", "draft_id": "d1",
-            "section_key": "eligibility", "instruction": "mention CLIA accreditation",
-        })
-        await bot.RfpBotHandler().on_message_activity(ctx)
+        ctx = FakeTurnContext()
+        await bot._apply_ai_edit(ctx, "d1", "eligibility", "mention CLIA accreditation")
 
     assert "Rewriting section" in _text_of(ctx.sent[0])
     card = _card_of(ctx.sent[-1])
@@ -449,29 +445,23 @@ async def test_ai_edit_card_action_success():
 
 
 @pytest.mark.asyncio
-async def test_ai_edit_card_action_draft_expired():
+async def test_apply_ai_edit_draft_expired():
     routes = {("POST", "/drafts/gone/edit/ai"): _mock_response(status_code=404)}
     with patch("bot.httpx.AsyncClient", side_effect=_client_factory(routes)):
-        ctx = FakeTurnContext(value={
-            "action": "ai_edit_rfp_section", "draft_id": "gone",
-            "section_key": "eligibility", "instruction": "shorten it",
-        })
-        await bot.RfpBotHandler().on_message_activity(ctx)
+        ctx = FakeTurnContext()
+        await bot._apply_ai_edit(ctx, "gone", "eligibility", "shorten it")
 
     assert "may have expired" in _text_of(ctx.sent[-1])
 
 
 @pytest.mark.asyncio
-async def test_ai_edit_card_action_unknown_section_reports_detail():
+async def test_apply_ai_edit_unknown_section_reports_detail():
     routes = {("POST", "/drafts/d1/edit/ai"): _mock_response(
         status_code=400, json_data={"detail": "Unknown section: not_a_real_section"},
     )}
     with patch("bot.httpx.AsyncClient", side_effect=_client_factory(routes)):
-        ctx = FakeTurnContext(value={
-            "action": "ai_edit_rfp_section", "draft_id": "d1",
-            "section_key": "not_a_real_section", "instruction": "do something",
-        })
-        await bot.RfpBotHandler().on_message_activity(ctx)
+        ctx = FakeTurnContext()
+        await bot._apply_ai_edit(ctx, "d1", "not_a_real_section", "do something")
 
     assert "Unknown section: not_a_real_section" in _text_of(ctx.sent[-1])
 
