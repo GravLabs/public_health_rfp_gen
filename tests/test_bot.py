@@ -275,13 +275,6 @@ def test_result_card_shows_edited_section_label():
     assert any(b.get("text") == "Updated: Eligibility" for b in card["body"])
 
 
-def test_format_rfp_markdown_skips_empty_sections():
-    md = bot._format_rfp_markdown("RFP-1", {"background": "Some text.", "eligibility": ""})
-    assert "Background and Purpose" in md
-    assert "Eligibility Criteria" not in md
-    assert "Some text." in md
-
-
 # ── Prompt handlers (via on_message_activity) ─────────────────────────────────────
 
 @pytest.mark.asyncio
@@ -560,15 +553,13 @@ async def test_generate_rfp_prompt_streams_progress_and_final_card(monkeypatch):
         await bot.RfpBotHandler().on_message_activity(ctx)
         await created["task"]
 
-    # Initial progress card + one update per section + one update for the result card
+    # Initial progress card + one update per section + one update for the result card.
+    # No follow-up dump of the full draft text — Draft Preview (the pinned Teams tab /
+    # Open Draft Preview button) is where a human reads the actual content now.
     assert _card_of(ctx.sent[0])["body"][0]["text"] == "Generating RFP Draft"
     assert len(ctx.updated) == 3
     assert ctx.updated[-1].attachments[0].content["body"][0]["text"] == "✓ Draft Ready — Gate Passed"
-
-    # Passed + sections present → markdown preview sent as a follow-up message
-    preview = _text_of(ctx.sent[-1])
-    assert "RFP-1" in preview
-    assert "Generated background text." in preview
+    assert len(ctx.sent) == 1
 
 
 @pytest.mark.asyncio

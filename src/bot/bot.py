@@ -714,13 +714,6 @@ async def _stream_and_update(
                             Activity(id=activity_id, type=ActivityTypes.message,
                                      attachments=[CardFactory.adaptive_card(card)])
                         )
-                        if event.get("passed") and event.get("sections"):
-                            preview = _format_rfp_markdown(
-                                event.get("rfp_id", ""), event["sections"]
-                            )
-                            await turn_context.send_activity(
-                                Activity(type=ActivityTypes.message, text=preview)
-                            )
 
                     elif event["type"] == "error":
                         await turn_context.update_activity(
@@ -734,30 +727,6 @@ async def _stream_and_update(
             Activity(id=activity_id, type=ActivityTypes.message,
                      text="Generation failed. Please try again or contact your administrator.")
         )
-
-
-# ── Markdown preview ────────────────────────────────────────────────────────────
-
-SECTION_HEADINGS = {
-    "background":             "1. Background and Purpose",
-    "funding_parameters":     "2. Funding Parameters",
-    "eligibility":            "3. Eligibility Criteria",
-    "scope_of_work":          "4. Scope of Work",
-    "reporting_requirements": "5. Reporting Requirements",
-    "budget_requirements":    "6. Budget Requirements",
-    "evaluation_criteria":    "7. Evaluation Criteria",
-    "submission_instructions":"8. Submission Instructions",
-}
-
-
-def _format_rfp_markdown(rfp_id: str, sections: dict[str, str]) -> str:
-    """Render all 8 RFP sections as a markdown Teams message."""
-    lines = [f"📄 **RFP Draft — {rfp_id}**\n*AI-generated · pending human review*\n"]
-    for key, heading in SECTION_HEADINGS.items():
-        content = sections.get(key, "").strip()
-        if content:
-            lines.append(f"\n---\n## {heading}\n\n{content}")
-    return "\n".join(lines)
 
 
 # ── Parameter parsing ───────────────────────────────────────────────────────────
