@@ -38,18 +38,29 @@ az bot update \
   --output none
 echo "  ✓ Bot Service endpoint updated"
 
-# Bicep @secure() params don't propagate from AZD env — set MICROSOFT_APP_PASSWORD directly
+# Bicep @secure() params don't propagate from AZD env — set MICROSOFT_APP_PASSWORD directly.
+# PUBLIC_API_URL is set here for the same reason as BOT_MESSAGING_ENDPOINT above: the FQDN
+# isn't known until after this deploy, and it changes on every fresh re-provision (new
+# resource-name token) — bot.py uses it to build the "Open Draft Preview" card button's URL,
+# which must be externally reachable (unlike API_URL, the container's own internal localhost
+# address used for bot.py -> main.py calls within the same container).
 API_APP_NAME=$(az containerapp list \
   --resource-group "$RESOURCE_GROUP" \
   --query "[?tags.\"azd-service-name\"=='api'].name | [0]" \
   -o tsv 2>/dev/null || echo "")
 BOT_APP_SECRET=$(azd env get-value BOT_APP_SECRET 2>/dev/null || echo "")
-if [ -n "$BOT_APP_SECRET" ] && [ -n "$API_APP_NAME" ]; then
+if [ -n "$API_APP_NAME" ]; then
+  ENV_VARS=("PUBLIC_API_URL=https://$API_FQDN")
+  ENV_VAR_NAMES=("PUBLIC_API_URL")
+  if [ -n "$BOT_APP_SECRET" ]; then
+    ENV_VARS+=("MICROSOFT_APP_PASSWORD=$BOT_APP_SECRET")
+    ENV_VAR_NAMES+=("MICROSOFT_APP_PASSWORD")
+  fi
   az containerapp update \
     --name "$API_APP_NAME" \
     --resource-group "$RESOURCE_GROUP" \
-    --set-env-vars "MICROSOFT_APP_PASSWORD=$BOT_APP_SECRET" \
-    --output none 2>/dev/null && echo "  ✓ MICROSOFT_APP_PASSWORD set on API container"
+    --set-env-vars "${ENV_VARS[@]}" \
+    --output none 2>/dev/null && echo "  ✓ Container env vars updated (${ENV_VAR_NAMES[*]})"
 fi
 
 # Persist the messaging endpoint for reference

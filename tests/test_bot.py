@@ -216,20 +216,28 @@ def test_progress_card_marks_completed_and_in_progress():
     assert text_by_section["Scope of Work"] == "○"
 
 
+def test_result_card_always_offers_draft_preview_link_first():
+    event = {"passed": False, "sharepoint_url": "", "draft_id": "d1",
+              "scores": {}, "failure_reasons": [], "rfp_id": "RFP-1"}
+    card = bot._result_card(event, "subtitle")
+    assert card["actions"][0]["type"] == "Action.OpenUrl"
+    assert card["actions"][0]["url"] == f"{bot.PUBLIC_API_URL}/drafts/d1/view"
+
+
 def test_result_card_passed_with_sharepoint_url_offers_open_link():
     event = {"passed": True, "sharepoint_url": "https://sp/doc.docx", "draft_id": "d1",
               "scores": {}, "failure_reasons": [], "rfp_id": "RFP-1"}
     card = bot._result_card(event, "subtitle")
-    assert card["actions"][0]["type"] == "Action.OpenUrl"
-    assert card["actions"][0]["url"] == "https://sp/doc.docx"
+    assert card["actions"][1]["type"] == "Action.OpenUrl"
+    assert card["actions"][1]["url"] == "https://sp/doc.docx"
 
 
 def test_result_card_passed_without_url_offers_approve_button():
     event = {"passed": True, "sharepoint_url": "", "draft_id": "d1",
               "scores": {}, "failure_reasons": [], "rfp_id": "RFP-1"}
     card = bot._result_card(event, "subtitle")
-    assert card["actions"][0]["type"] == "Action.Submit"
-    assert card["actions"][0]["data"] == {"action": "approve_rfp", "draft_id": "d1"}
+    assert card["actions"][1]["type"] == "Action.Submit"
+    assert card["actions"][1]["data"] == {"action": "approve_rfp", "draft_id": "d1"}
 
 
 def test_result_card_failed_offers_reject_but_no_approve_and_lists_reasons():
@@ -238,7 +246,8 @@ def test_result_card_failed_offers_reject_but_no_approve_and_lists_reasons():
               "rfp_id": "RFP-1"}
     card = bot._result_card(event, "subtitle")
     # Reject/Edit are offered regardless of gate pass/fail; Approve is not (no sections to edit here).
-    assert [a["data"]["action"] for a in card["actions"]] == ["reject_rfp"]
+    submit_actions = [a["data"]["action"] for a in card["actions"] if a["type"] == "Action.Submit"]
+    assert submit_actions == ["reject_rfp"]
     assert any("coherence below threshold" in b.get("text", "") for b in card["body"])
 
 
@@ -251,12 +260,11 @@ def test_result_card_with_sections_offers_edit_action():
     assert card["actions"][-1]["card"]["actions"][0]["data"] == {"action": "edit_rfp_section", "draft_id": "d1"}
 
 
-def test_result_card_shows_edited_section_text():
+def test_result_card_shows_edited_section_label():
     event = {"passed": True, "sharepoint_url": "", "draft_id": "d1",
               "scores": {}, "failure_reasons": [], "rfp_id": "RFP-1",
-              "edited_section_key": "eligibility", "edited_section_text": "Only accredited labs may apply."}
+              "edited_section_key": "eligibility"}
     card = bot._result_card(event, "Edited: Eligibility")
-    assert any(b.get("text") == "Only accredited labs may apply." for b in card["body"])
     assert any(b.get("text") == "Updated: Eligibility" for b in card["body"])
 
 

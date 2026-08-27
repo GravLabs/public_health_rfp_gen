@@ -26,6 +26,11 @@ APP_PASSWORD = os.getenv("MICROSOFT_APP_PASSWORD", "")
 log = logging.getLogger(__name__)
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+# API_URL above is the container-internal address (bot.py -> main.py, same container).
+# Card buttons open in the user's own client, so they need the externally reachable
+# address instead — set by scripts/post-deploy.sh after every deploy, since the FQDN
+# isn't known until then and changes on every fresh re-provision.
+PUBLIC_API_URL = os.getenv("PUBLIC_API_URL", API_URL)
 
 SECTION_DISPLAY = {
     "background":             "Background and Purpose",
@@ -143,18 +148,20 @@ def _result_card(event: dict, subtitle: str) -> dict[str, Any]:
         })
 
     edited_key = event.get("edited_section_key")
-    edited_text = event.get("edited_section_text")
-    if edited_key and edited_text:
-        body += [
-            {"type": "TextBlock", "text": f"Updated: {edited_key.replace('_', ' ').title()}",
-             "weight": "Bolder", "size": "Small", "spacing": "Medium"},
-            {"type": "TextBlock", "text": edited_text, "wrap": True, "size": "Small", "spacing": "None"},
-        ]
+    if edited_key:
+        body.append({"type": "TextBlock", "text": f"Updated: {edited_key.replace('_', ' ').title()}",
+                     "isSubtle": True, "size": "Small", "spacing": "Small"})
 
     draft_id = event.get("draft_id", "")
     sections = event.get("sections", {})
 
     actions = []
+    if draft_id:
+        actions.append({
+            "type": "Action.OpenUrl",
+            "title": "📄 Open Draft Preview",
+            "url": f"{PUBLIC_API_URL}/drafts/{draft_id}/view",
+        })
     if passed and sp_url:
         actions.append({
             "type": "Action.OpenUrl",
@@ -561,7 +568,6 @@ class RfpBotHandler(ActivityHandler):
                     "rfp_id": evaluation["rfp_id"],
                     "sections": draft_state.get("sections", {}),
                     "edited_section_key": section_key,
-                    "edited_section_text": draft_state.get("sections", {}).get(section_key, ""),
                 }
                 subtitle = f"Edited: {section_key.replace('_', ' ').title()}"
                 card = _result_card(event, subtitle)

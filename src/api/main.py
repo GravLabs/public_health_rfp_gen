@@ -112,6 +112,19 @@ _draft_cache: dict[str, dict] = {}
 _last_draft_id: Optional[str] = None
 
 
+def _markdown_to_html(text: str) -> str:
+    """Section text is markdown (the orchestrator's LLM output, same content
+    SharePointClient.draft_to_docx renders as Word) -- but it can also contain
+    a human's free-typed Edit Section text. The `markdown` library passes raw
+    HTML straight through unescaped, so pre-escape first: none of the markdown
+    we need (headings/bold/italic/tables/lists) uses < > &, so this can't
+    break rendering, but it does stop a pasted <script> tag from executing
+    when this page is opened as the pinned Teams tab."""
+    import markdown
+    from html import escape
+    return markdown.markdown(escape(text, quote=False), extensions=["tables"])
+
+
 def _render_draft_html(draft_id: str, cached: dict) -> str:
     """Read-only HTML preview of a cached draft's current sections, for the
     Teams "Draft Preview" tab — separate from the chat so edits are visible
@@ -125,7 +138,7 @@ def _render_draft_html(draft_id: str, cached: dict) -> str:
     gate_class = {"PASS": "pass", "FAIL": "fail"}.get(gate_str, "pending")
 
     sections_html = "".join(
-        f'<section><h2>{escape(key.replace("_", " ").title())}</h2><pre>{escape(text)}</pre></section>'
+        f'<section><h2>{escape(key.replace("_", " ").title())}</h2>{_markdown_to_html(text)}</section>'
         for key, text in cached["sections"].items()
     )
 
@@ -146,7 +159,14 @@ def _render_draft_html(draft_id: str, cached: dict) -> str:
             padding: 12px 16px; margin-bottom: 12px; }}
   section h2 {{ font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
                color: #374151; margin: 0 0 6px; }}
-  pre {{ white-space: pre-wrap; font-family: inherit; font-size: .92rem; margin: 0; }}
+  section p {{ font-size: .92rem; line-height: 1.5; margin: 0 0 10px; }}
+  section p:last-child {{ margin-bottom: 0; }}
+  section h4, section h5, section h6 {{ font-size: .95rem; margin: 12px 0 4px; color: #111827; }}
+  section ul, section ol {{ margin: 0 0 10px; padding-left: 1.4em; font-size: .92rem; line-height: 1.5; }}
+  section hr {{ border: none; border-top: 1px solid #D0DAF0; margin: 10px 0; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 0 0 12px; font-size: .88rem; }}
+  th, td {{ border: 1px solid #D0DAF0; padding: 6px 10px; text-align: left; vertical-align: top; }}
+  th {{ background: #EBF0FA; font-weight: 600; }}
 </style></head>
 <body>
   <h1>{escape(cached['rfp_id'])}</h1>
