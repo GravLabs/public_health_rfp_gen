@@ -488,6 +488,9 @@ graph TD
     <div class="callout info">
       Bot Service F0 is free for unlimited Teams messages. No M365 Copilot or Teams Premium license required. The bot appears in Teams as a personal app after sideloading the app manifest during post-provision.
     </div>
+
+    <h3>Draft Preview tab and PUBLIC_API_URL</h3>
+    <p><code>teams-app/manifest.json</code> declares a personal <code>staticTabs</code> entry ("Draft Preview") pinned next to the bot's chat, pointing at <code>GET /drafts/latest/view</code> — a read-only HTML page, no JS, 8s meta-refresh. bot.py's card buttons and this tab both need a URL the user's own Teams client can actually reach, which <code>API_URL</code> (the container-internal <code>localhost:8000</code> address bot.py uses to call <code>main.py</code> within the same container) is not. <code>PUBLIC_API_URL</code> is set separately by <code>scripts/post-deploy.sh</code> after every deploy — the container app FQDN isn't known until then and changes on every fresh re-provision (new resource-name token), the same reason <code>BOT_MESSAGING_ENDPOINT</code> and the manifest's own <code>validDomains</code>/tab <code>contentUrl</code> are all re-resolved there and in <code>install.sh</code> rather than hardcoded.</p>
   </section>
 
   <!-- ── Streaming Architecture ──────────────────────────────────────────────── -->
@@ -654,6 +657,18 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
           </tr>
           <tr>
             <td>GET</td>
+            <td class="mono-cell">/drafts/{draft_id}/view</td>
+            <td>—</td>
+            <td>Read-only HTML preview of a draft's current sections, rendered from markdown (headings, lists, tables) — no auth, backs the "Open Draft Preview" card button</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td class="mono-cell">/drafts/latest/view</td>
+            <td>—</td>
+            <td>Same as above, for whichever draft was most recently generated/edited/rejected — backs the pinned Teams "Draft Preview" personal tab (fixed URL, no per-draft config)</td>
+          </tr>
+          <tr>
+            <td>GET</td>
             <td class="mono-cell">/health</td>
             <td>—</td>
             <td>Service health + dependency status</td>
@@ -663,7 +678,7 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
     </div>
 
     <p>All endpoints use <code>DefaultAzureCredential</code> — no API keys in configuration. The lifespan context manager initializes all SDK clients (AI Search, Foundry, APIM token) at startup.</p>
-    <p>The Teams result card offers all three review actions: <strong>Approve &amp; Save to SharePoint</strong>, <strong>Reject</strong>, and <strong>Edit Section</strong> (an inline expanding card with a section picker + text box) — available regardless of gate pass/fail, since a failed draft is exactly when editing to fix it matters most.</p>
+    <p>The Teams result card offers all three review actions: <strong>Approve &amp; Save to SharePoint</strong>, <strong>Reject</strong>, and <strong>Edit Section</strong> (an inline expanding card with a section picker + text box) — available regardless of gate pass/fail, since a failed draft is exactly when editing to fix it matters most. Every card also opens with a <strong>📄 Open Draft Preview</strong> button (<code>Action.OpenUrl</code> to <code>PUBLIC_API_URL/drafts/{draft_id}/view</code>) so a program officer can see the draft's actual current text without approving first — see the Teams Bot section below for why this needs a separate, externally-reachable URL rather than the container-internal <code>API_URL</code> bot.py already uses for its own calls to <code>main.py</code>.</p>
   </section>
 
   <!-- ── UX Options ──────────────────────────────────────────────────────────── -->
