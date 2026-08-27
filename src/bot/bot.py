@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import urllib.parse
 from typing import Any
 
 import httpx
@@ -31,6 +32,26 @@ API_URL = os.getenv("API_URL", "http://localhost:8000")
 # address instead — set by scripts/post-deploy.sh after every deploy, since the FQDN
 # isn't known until then and changes on every fresh re-provision.
 PUBLIC_API_URL = os.getenv("PUBLIC_API_URL", API_URL)
+
+# entityId of the personal staticTab declared in teams-app/manifest.json.
+DRAFT_PREVIEW_ENTITY_ID = "draftPreview"
+
+
+def _draft_preview_url(draft_id: str) -> str:
+    """Teams entity deep link — switches to the pinned Draft Preview tab
+    inside the Teams client instead of opening a browser. The tab itself is a
+    *static* tab (fixed contentUrl, /drafts/latest/view) so this always shows
+    whatever draft was most recently touched, not necessarily draft_id — the
+    right tradeoff for a card you just generated/edited, since that draft
+    _is_ "latest" at the moment the card is built. webUrl is the fallback for
+    clients where the app/tab isn't recognized (e.g. Teams web without the
+    app installed)."""
+    fallback = f"{PUBLIC_API_URL}/drafts/{draft_id}/view"
+    return (
+        f"https://teams.microsoft.com/l/entity/{APP_ID}/{DRAFT_PREVIEW_ENTITY_ID}"
+        f"?webUrl={urllib.parse.quote(fallback, safe='')}"
+        f"&label={urllib.parse.quote('Draft Preview')}"
+    )
 
 SECTION_DISPLAY = {
     "background":             "Background and Purpose",
@@ -160,7 +181,7 @@ def _result_card(event: dict, subtitle: str) -> dict[str, Any]:
         actions.append({
             "type": "Action.OpenUrl",
             "title": "📄 Open Draft Preview",
-            "url": f"{PUBLIC_API_URL}/drafts/{draft_id}/view",
+            "url": _draft_preview_url(draft_id),
         })
     if passed and sp_url:
         actions.append({

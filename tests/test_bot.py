@@ -13,6 +13,7 @@ from __future__ import annotations
 import io
 import json
 import sys
+import urllib.parse
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -221,7 +222,13 @@ def test_result_card_always_offers_draft_preview_link_first():
               "scores": {}, "failure_reasons": [], "rfp_id": "RFP-1"}
     card = bot._result_card(event, "subtitle")
     assert card["actions"][0]["type"] == "Action.OpenUrl"
-    assert card["actions"][0]["url"] == f"{bot.PUBLIC_API_URL}/drafts/d1/view"
+    assert card["actions"][0]["url"] == bot._draft_preview_url("d1")
+
+
+def test_draft_preview_url_is_a_teams_entity_deep_link_with_fallback():
+    url = bot._draft_preview_url("d1")
+    assert url.startswith(f"https://teams.microsoft.com/l/entity/{bot.APP_ID}/{bot.DRAFT_PREVIEW_ENTITY_ID}")
+    assert urllib.parse.quote(f"{bot.PUBLIC_API_URL}/drafts/d1/view", safe="") in url
 
 
 def test_result_card_passed_with_sharepoint_url_offers_open_link():
