@@ -21,20 +21,22 @@ def score_completeness(draft: dict[str, str], required_sections: list[str]) -> t
 
     for section in required_sections:
         content = draft.get(section, "").strip()
+        label = section.replace("_", " ").title()
         if not content:
-            missing.append(section)
+            missing.append(label)
             continue
         word_count = len(content.split())
         min_words = MIN_SECTION_WORDS.get(section, 20)
         if word_count < min_words:
-            thin.append(f"{section}({word_count}<{min_words}w)")
+            word = "word" if word_count == 1 else "words"
+            thin.append(f"{label} is too short ({word_count} {word}, needs at least {min_words})")
 
     if missing or thin:
         issues = []
         if missing:
-            issues.append(f"missing_sections={missing}")
-        if thin:
-            issues.append(f"thin_sections={thin}")
+            word = "section" if len(missing) == 1 else "sections"
+            issues.append(f"Missing {word}: {', '.join(missing)}")
+        issues.extend(thin)
         total_issues = len(missing) + len(thin)
         score = max(0.0, 1.0 - (total_issues / len(required_sections)))
         return score, "; ".join(issues)

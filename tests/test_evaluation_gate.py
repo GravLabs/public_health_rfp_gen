@@ -57,6 +57,19 @@ def test_completeness_short_sections_penalize():
     assert score < 0.5
 
 
+def test_completeness_detail_is_human_readable():
+    from evaluators.completeness import score_completeness
+    sections = {k: "Some real content here." for k in REQUIRED_SECTIONS}
+    sections["background"] = "one"
+    del sections["eligibility"]
+    _, detail = score_completeness(sections, REQUIRED_SECTIONS)
+    assert "Background is too short (1 word, needs at least 50)" in detail
+    assert "Missing section: Eligibility" in detail
+    # No raw Python-repr fragments (old format: thin_sections=['background(1<50w)'])
+    assert "thin_sections" not in detail
+    assert "[" not in detail
+
+
 # ── Compliance evaluator ────────────────────────────────────────────────────
 
 def test_compliance_clean_text_passes():
@@ -162,4 +175,6 @@ def test_gate_fails_on_incomplete_draft():
     params = {"total_funding": 3_500_000, "period_of_performance_months": 24, "cost_sharing": "No"}
     decision = evaluate_draft("test-draft-002", sections, params)
     assert decision.result == GateResult.FAIL
-    assert any("completeness" in r.lower() for r in decision.blocking_failures)
+    completeness_score = next(s for s in decision.scores if s.metric == "section_completeness")
+    assert not completeness_score.passed
+    assert any("missing" in r.lower() for r in decision.blocking_failures)

@@ -91,7 +91,7 @@ def evaluate_draft(draft_id: str, draft: dict[str, str], input_spec: dict[str, A
                    completeness >= THRESHOLDS["section_completeness"], detail)
     scores.append(sc)
     if not sc.passed:
-        blocking.append(f"section_completeness={completeness:.2f} (missing: {detail})")
+        blocking.append(detail)
 
     # 2. Parameter accuracy (local — deterministic comparison)
     param_acc, param_detail = score_parameter_accuracy(draft, input_spec)
