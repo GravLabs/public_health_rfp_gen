@@ -454,10 +454,11 @@ graph TD
   LOOP["④ Each section completes\nBot calls UpdateActivity\n1/8 ✓ … 8/8 ✓"]
   EVAL["⑤ Evaluation gate\nGroundedness · Coherence · Compliance\nCompleteness · Parameter Accuracy"]
   CACHE["⑥ Draft cached in memory\n_draft_cache[draft_id] — regardless of gate result"]
-  FINAL["⑦ Final result card\nScores + Approve / Reject / Edit Section actions"]
+  FINAL["⑦ Final result card\nScores + Approve / Reject / Edit Section / AI Edit actions"]
   APPROVE["⑧a User clicks Approve\nActivity.value → POST /export/{draft_id}"]
   REJECT["⑧b User clicks Reject\nActivity.value → POST /drafts/{id}/reject"]
-  EDIT["⑧c User submits Edit Section\nActivity.value → POST /drafts/{id}/edit"]
+  EDIT["⑧c User submits Edit Section (full text)\nActivity.value → POST /drafts/{id}/edit"]
+  AIEDIT["⑧d AI Edit card, or a typed chat instruction\n('edit the eligibility section to...')\n→ POST /drafts/{id}/edit/ai"]
   UPLOAD["⑨a upload_draft_docx()\n→ SharePoint Generated Drafts\nReturns webUrl"]
   REJECTED["⑨b status → REJECTED\nGate decision left unchanged"]
   REEVAL["⑨c Section replaced → gate re-run\nNew version archived to Fabric OneLake"]
@@ -471,9 +472,11 @@ graph TD
   FINAL --> APPROVE
   FINAL --> REJECT
   FINAL --> EDIT
+  FINAL --> AIEDIT
   APPROVE --> UPLOAD
   REJECT --> REJECTED
   EDIT --> REEVAL
+  AIEDIT --> REEVAL
   REEVAL --> FINAL
       </pre>
     </div>
@@ -656,6 +659,12 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
             <td>Applies the edit, re-runs the eval gate, resets status to <code>PENDING</code>, writes a new versioned copy to Fabric OneLake unconditionally</td>
           </tr>
           <tr>
+            <td>POST</td>
+            <td class="mono-cell">/drafts/{draft_id}/edit/ai</td>
+            <td><code>section_key</code>, <code>instruction</code></td>
+            <td>Same as <code>/edit</code>, but an LLM rewrites the named section from its current text + the instruction first (via <code>_azure_openai_chat</code>, the same helper <code>/classify</code>/<code>/review</code>/<code>/audit_budget</code> use) — shares <code>_reevaluate_and_persist_edit()</code> with <code>/edit</code> for the gate/Fabric tail</td>
+          </tr>
+          <tr>
             <td>GET</td>
             <td class="mono-cell">/drafts/{draft_id}/view</td>
             <td>—</td>
@@ -663,9 +672,15 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
           </tr>
           <tr>
             <td>GET</td>
+            <td class="mono-cell">/drafts/latest</td>
+            <td>—</td>
+            <td>JSON status of whichever draft was most recently generated/edited/rejected — lets bot.py resolve "which draft" for a typed chat edit instruction, which carries no <code>draft_id</code> the way a card submission does</td>
+          </tr>
+          <tr>
+            <td>GET</td>
             <td class="mono-cell">/drafts/latest/view</td>
             <td>—</td>
-            <td>Same as above, for whichever draft was most recently generated/edited/rejected — backs the pinned Teams "Draft Preview" personal tab (fixed URL, no per-draft config)</td>
+            <td>Same idea as <code>/drafts/latest</code> but the HTML preview — backs the pinned Teams "Draft Preview" personal tab (fixed URL, no per-draft config)</td>
           </tr>
           <tr>
             <td>GET</td>
@@ -678,7 +693,8 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
     </div>
 
     <p>All endpoints use <code>DefaultAzureCredential</code> — no API keys in configuration. The lifespan context manager initializes all SDK clients (AI Search, Foundry, APIM token) at startup.</p>
-    <p>The Teams result card offers all three review actions: <strong>Approve &amp; Save to SharePoint</strong>, <strong>Reject</strong>, and <strong>Edit Section</strong> (an inline expanding card with a section picker + text box) — available regardless of gate pass/fail, since a failed draft is exactly when editing to fix it matters most. Every card also opens with a <strong>📄 Open Draft Preview</strong> button (<code>Action.OpenUrl</code> to <code>PUBLIC_API_URL/drafts/{draft_id}/view</code>) so a program officer can see the draft's actual current text without approving first — see the Teams Bot section below for why this needs a separate, externally-reachable URL rather than the container-internal <code>API_URL</code> bot.py already uses for its own calls to <code>main.py</code>.</p>
+    <p>The Teams result card offers all four review actions: <strong>Approve &amp; Save to SharePoint</strong>, <strong>Reject</strong>, <strong>Edit Section</strong> (an inline expanding card with a section picker + full-text box), and <strong>AI Edit</strong> (same picker, but an instruction box — <code>bot.py</code> calls <code>POST /drafts/{id}/edit/ai</code> instead of <code>/edit</code>) — available regardless of gate pass/fail, since a failed draft is exactly when editing to fix it matters most. Every card also opens with a <strong>📄 Open Draft Preview</strong> button (<code>Action.OpenUrl</code> to <code>PUBLIC_API_URL/drafts/{draft_id}/view</code>) so a program officer can see the draft's actual current text without approving first — see the Teams Bot section below for why this needs a separate, externally-reachable URL rather than the container-internal <code>API_URL</code> bot.py already uses for its own calls to <code>main.py</code>.</p>
+    <p>A plain typed message skips the card entirely for the AI Edit path: <code>bot.py</code>'s <code>_extract_section_edit()</code> matches text against an edit verb (edit/change/update/revise/rewrite/modify) plus a known section name, and only runs when <code>_detect_intent()</code> found no other match — so "update this budget for allowable costs" still resolves to Budget Audit, not a stray rewrite. Once matched, <code>GET /drafts/latest</code> resolves "which draft" (chat text carries no <code>draft_id</code> the way a card submission does), then the whole message is sent as the instruction to the same <code>POST /drafts/{id}/edit/ai</code> call the card action uses.</p>
   </section>
 
   <!-- ── UX Options ──────────────────────────────────────────────────────────── -->
