@@ -453,10 +453,14 @@ graph TD
   STREAM["③ Background NDJSON stream\nPOST /generate/stream"]
   LOOP["④ Each section completes\nBot calls UpdateActivity\n1/8 ✓ … 8/8 ✓"]
   EVAL["⑤ Evaluation gate\nGroundedness · Coherence · Compliance\nCompleteness · Parameter Accuracy"]
-  CACHE["⑥ Gate PASS → draft cached in memory\n_draft_cache[draft_id]"]
-  FINAL["⑦ Final result card\nScores + '✅ Approve & Save to SharePoint' button"]
-  APPROVE["⑧ User clicks Approve\nActivity.value → POST /export/{draft_id}"]
-  UPLOAD["⑨ upload_draft_docx()\n→ SharePoint Generated Drafts\nReturns webUrl"]
+  CACHE["⑥ Draft cached in memory\n_draft_cache[draft_id] — regardless of gate result"]
+  FINAL["⑦ Final result card\nScores + Approve / Reject / Edit Section actions"]
+  APPROVE["⑧a User clicks Approve\nActivity.value → POST /export/{draft_id}"]
+  REJECT["⑧b User clicks Reject\nActivity.value → POST /drafts/{id}/reject"]
+  EDIT["⑧c User submits Edit Section\nActivity.value → POST /drafts/{id}/edit"]
+  UPLOAD["⑨a upload_draft_docx()\n→ SharePoint Generated Drafts\nReturns webUrl"]
+  REJECTED["⑨b status → REJECTED\nGate decision left unchanged"]
+  REEVAL["⑨c Section replaced → gate re-run\nNew version archived to Fabric OneLake"]
 
   MSG --> CARD0
   CARD0 --> STREAM
@@ -465,7 +469,12 @@ graph TD
   EVAL --> CACHE
   CACHE --> FINAL
   FINAL --> APPROVE
+  FINAL --> REJECT
+  FINAL --> EDIT
   APPROVE --> UPLOAD
+  REJECT --> REJECTED
+  EDIT --> REEVAL
+  REEVAL --> FINAL
       </pre>
     </div>
 
