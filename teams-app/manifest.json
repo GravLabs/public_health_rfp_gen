@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
   "manifestVersion": "1.16",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "id": "8c22932d-3a37-45aa-8b82-76a483075c3f",
   "developer": {
     "name": "Your Organization",
@@ -22,6 +22,16 @@
     "full": "Generate, review, and manage public health laboratory RFPs using AI grounded on a cooperative agreement corpus. Drafts are evaluated against 5 quality dimensions before being saved to SharePoint."
   },
   "accentColor": "#0369A1",
+  "staticTabs": [
+    {
+      "entityId": "draftPreview",
+      "name": "Draft Preview",
+      "contentUrl": "https://ca-pubhealth-api-ies7lsbvjsdiw.jollymushroom-16041296.eastus.azurecontainerapps.io/drafts/latest/view",
+      "scopes": [
+        "personal"
+      ]
+    }
+  ],
   "bots": [
     {
       "botId": "8c22932d-3a37-45aa-8b82-76a483075c3f",

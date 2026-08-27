@@ -458,6 +458,8 @@ if d.get('bots'):
 fqdn = '${api_fqdn}'
 if fqdn:
     d['validDomains'] = [fqdn]
+    if d.get('staticTabs'):
+        d['staticTabs'][0]['contentUrl'] = f'https://{fqdn}/drafts/latest/view'
 d['developer']['name'] = '''${dev_name}'''
 d['developer']['websiteUrl'] = '''${dev_url}'''
 d['developer']['privacyUrl'] = '''${dev_url}'''

@@ -22,7 +22,7 @@ from azure.identity import DefaultAzureCredential
 from botbuilder.core import BotFrameworkAdapter, BotFrameworkAdapterSettings
 from botbuilder.schema import Activity
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Query, Request
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse, HTMLResponse
 
 from bot import RfpBotHandler
 from models import (
@@ -106,6 +106,57 @@ setup_observability(app)
 
 # In-memory draft cache keyed by draft_id — populated after gate PASS, used by /export
 _draft_cache: dict[str, dict] = {}
+
+# Most recently generated/edited/rejected draft — backs GET /drafts/latest/view,
+# a read-only preview pinned as a Teams personal tab (see teams-app/manifest.json).
+_last_draft_id: Optional[str] = None
+
+
+def _render_draft_html(draft_id: str, cached: dict) -> str:
+    """Read-only HTML preview of a cached draft's current sections, for the
+    Teams "Draft Preview" tab — separate from the chat so edits are visible
+    without scrolling back through card history."""
+    from html import escape
+
+    gate = cached.get("gate_decision")
+    gate_str = gate.value if hasattr(gate, "value") else (gate or "PENDING")
+    status = cached["status"]
+    status_str = status.value if hasattr(status, "value") else status
+    gate_class = {"PASS": "pass", "FAIL": "fail"}.get(gate_str, "pending")
+
+    sections_html = "".join(
+        f'<section><h2>{escape(key.replace("_", " ").title())}</h2><pre>{escape(text)}</pre></section>'
+        for key, text in cached["sections"].items()
+    )
+
+    return f"""<!doctype html>
+<html><head><meta charset="utf-8">
+<meta http-equiv="refresh" content="8">
+<title>{escape(cached['rfp_id'])}</title>
+<style>
+  body {{ font-family: -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 16px 24px 40px;
+         color: #111827; background: #F4F6FB; }}
+  h1 {{ font-size: 1.15rem; margin: 0 0 2px; }}
+  .meta {{ color: #6B7280; font-size: .85rem; margin-bottom: 16px; }}
+  .badge {{ display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .78rem; font-weight: 600; }}
+  .pass {{ background: #D1FAE5; color: #059669; }}
+  .fail {{ background: #FEE2E2; color: #B91C1C; }}
+  .pending {{ background: #DBEAFE; color: #1D4ED8; }}
+  section {{ background: white; border: 1px solid #D0DAF0; border-radius: 8px;
+            padding: 12px 16px; margin-bottom: 12px; }}
+  section h2 {{ font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
+               color: #374151; margin: 0 0 6px; }}
+  pre {{ white-space: pre-wrap; font-family: inherit; font-size: .92rem; margin: 0; }}
+</style></head>
+<body>
+  <h1>{escape(cached['rfp_id'])}</h1>
+  <div class="meta">
+    {escape(cached['program_area'])} &middot; {escape(cached['federal_sponsor'])} &middot;
+    <span class="badge {gate_class}">{escape(gate_str)}</span>
+    &middot; status: {escape(str(status_str))} &middot; edit v{cached.get('edit_version', 0)}
+  </div>
+  {sections_html}
+</body></html>"""
 
 
 async def _call_orchestrator(request: RfpRequest) -> dict:
@@ -228,6 +279,8 @@ async def generate_and_evaluate(request: RfpRequest) -> GenerateAndEvaluateRespo
         "reject_reason": None,
         "edit_version": 0,
     }
+    global _last_draft_id
+    _last_draft_id = draft.draft_id
 
     return GenerateAndEvaluateResponse(
         draft=draft,
@@ -323,6 +376,8 @@ async def generate_stream(request: RfpRequest):
                 "reject_reason": None,
                 "edit_version": 0,
             }
+            global _last_draft_id
+            _last_draft_id = draft.draft_id
 
             yield json.dumps({
                 "type": "gate_result",
@@ -389,6 +444,28 @@ async def get_draft(draft_id: str) -> DraftStatusResponse:
     )
 
 
+# Registered before /drafts/{draft_id}/view so the literal "latest" path wins —
+# {draft_id} would otherwise greedily match it first.
+@app.get("/drafts/latest/view", response_class=HTMLResponse,
+         summary="Read-only HTML preview of the most recently touched draft (Teams personal tab)")
+async def view_latest_draft() -> HTMLResponse:
+    if not _last_draft_id or _last_draft_id not in _draft_cache:
+        return HTMLResponse(
+            "<html><body style='font-family:sans-serif;padding:2rem;color:#6B7280'>"
+            "No draft yet — generate one in the chat.</body></html>"
+        )
+    return HTMLResponse(_render_draft_html(_last_draft_id, _draft_cache[_last_draft_id]))
+
+
+@app.get("/drafts/{draft_id}/view", response_class=HTMLResponse,
+         summary="Read-only HTML preview of a specific draft's current sections")
+async def view_draft(draft_id: str) -> HTMLResponse:
+    cached = _draft_cache.get(draft_id)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    return HTMLResponse(_render_draft_html(draft_id, cached))
+
+
 @app.post("/drafts/{draft_id}/reject", response_model=DraftStatusResponse, summary="Reject a draft")
 async def reject_draft(draft_id: str, body: RejectDraftRequest = RejectDraftRequest()) -> DraftStatusResponse:
     """Mark a cached draft as rejected. Does not touch SharePoint/Fabric — a
@@ -399,6 +476,8 @@ async def reject_draft(draft_id: str, body: RejectDraftRequest = RejectDraftRequ
 
     cached["status"] = DraftStatus.REJECTED
     cached["reject_reason"] = body.reason
+    global _last_draft_id
+    _last_draft_id = draft_id
 
     return DraftStatusResponse(
         draft_id=draft_id,
@@ -434,6 +513,8 @@ async def edit_draft(draft_id: str, body: EditDraftRequest) -> EvaluationResult:
 
     cached["gate_decision"] = evaluation.gate_decision
     cached["status"] = DraftStatus.PENDING
+    global _last_draft_id
+    _last_draft_id = draft_id
 
     # Fabric gets every version unconditionally, regardless of the original
     # request's write_to_fabric flag — SharePoint stays approve-only (unchanged,
