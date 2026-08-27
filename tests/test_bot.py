@@ -232,13 +232,32 @@ def test_result_card_passed_without_url_offers_approve_button():
     assert card["actions"][0]["data"] == {"action": "approve_rfp", "draft_id": "d1"}
 
 
-def test_result_card_failed_has_no_actions_and_lists_reasons():
+def test_result_card_failed_offers_reject_but_no_approve_and_lists_reasons():
     event = {"passed": False, "sharepoint_url": "", "draft_id": "d1",
               "scores": {"coherence": 0.5}, "failure_reasons": ["coherence below threshold"],
               "rfp_id": "RFP-1"}
     card = bot._result_card(event, "subtitle")
-    assert card["actions"] == []
+    # Reject/Edit are offered regardless of gate pass/fail; Approve is not (no sections to edit here).
+    assert [a["data"]["action"] for a in card["actions"]] == ["reject_rfp"]
     assert any("coherence below threshold" in b.get("text", "") for b in card["body"])
+
+
+def test_result_card_with_sections_offers_edit_action():
+    event = {"passed": False, "sharepoint_url": "", "draft_id": "d1",
+              "scores": {}, "failure_reasons": [], "rfp_id": "RFP-1",
+              "sections": {"background": "Some background text."}}
+    card = bot._result_card(event, "subtitle")
+    assert card["actions"][-1]["type"] == "Action.ShowCard"
+    assert card["actions"][-1]["card"]["actions"][0]["data"] == {"action": "edit_rfp_section", "draft_id": "d1"}
+
+
+def test_result_card_shows_edited_section_text():
+    event = {"passed": True, "sharepoint_url": "", "draft_id": "d1",
+              "scores": {}, "failure_reasons": [], "rfp_id": "RFP-1",
+              "edited_section_key": "eligibility", "edited_section_text": "Only accredited labs may apply."}
+    card = bot._result_card(event, "Edited: Eligibility")
+    assert any(b.get("text") == "Only accredited labs may apply." for b in card["body"])
+    assert any(b.get("text") == "Updated: Eligibility" for b in card["body"])
 
 
 def test_format_rfp_markdown_skips_empty_sections():
