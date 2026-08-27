@@ -96,6 +96,11 @@ class EditDraftRequest(BaseModel):
     sections: dict[str, str]  # partial update — only the keys being changed
 
 
+class AiEditDraftRequest(BaseModel):
+    section_key: str
+    instruction: str
+
+
 class DraftStatusResponse(BaseModel):
     draft_id: str
     rfp_id: str

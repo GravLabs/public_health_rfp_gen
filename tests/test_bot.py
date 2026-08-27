@@ -153,6 +153,29 @@ def _client_factory(routes: dict, calls: list | None = None):
     return _factory
 
 
+# ── Section-edit instruction detection ────────────────────────────────────────────
+
+@pytest.mark.parametrize("text,expected", [
+    ("Edit the eligibility section to mention CLIA accreditation", "eligibility"),
+    ("update the funding parameters to require quarterly reports", "funding_parameters"),
+    ("revise scope of work to add a timeline", "scope_of_work"),
+    ("rewrite background", "background"),
+    ("audit this budget for allowable costs", None),  # no edit verb
+    ("give me an update on recent CFR changes", None),  # no section reference
+    ("What's the weather today?", None),
+])
+def test_extract_section_edit(text, expected):
+    assert bot._extract_section_edit(text) == expected
+
+
+def test_detect_intent_takes_priority_over_section_edit_extraction():
+    # "budget" would also satisfy _extract_section_edit's section-reference check
+    # (budget_requirements), and "update" is an edit verb -- but _detect_intent's
+    # audit_budget match must win so this doesn't get misrouted into an AI edit.
+    text = "please update this budget for allowable costs"
+    assert bot._detect_intent(text) == "audit_budget"
+
+
 # ── Intent detection ─────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("text,expected", [
@@ -263,8 +286,9 @@ def test_result_card_with_sections_offers_edit_action():
               "scores": {}, "failure_reasons": [], "rfp_id": "RFP-1",
               "sections": {"background": "Some background text."}}
     card = bot._result_card(event, "subtitle")
-    assert card["actions"][-1]["type"] == "Action.ShowCard"
-    assert card["actions"][-1]["card"]["actions"][0]["data"] == {"action": "edit_rfp_section", "draft_id": "d1"}
+    show_card_actions = {a["card"]["actions"][0]["data"]["action"]
+                          for a in card["actions"] if a["type"] == "Action.ShowCard"}
+    assert show_card_actions == {"edit_rfp_section", "ai_edit_rfp_section"}
 
 
 def test_result_card_shows_edited_section_label():
@@ -390,6 +414,88 @@ async def test_approve_rfp_action_export_failure_reported():
         await bot.RfpBotHandler().on_message_activity(ctx)
 
     assert "SharePoint upload failed" in _text_of(ctx.sent[-1])
+
+
+# ── AI Edit (card action + typed chat instruction) ────────────────────────────────
+
+def _ai_edit_routes(draft_id="d1"):
+    return {
+        ("POST", f"/drafts/{draft_id}/edit/ai"): _mock_response(json_data={
+            "gate_decision": "PASS", "rfp_id": "RFP-1",
+            "scores": {"completeness": 1.0, "parameter_accuracy": 1.0, "compliance": 0.9,
+                       "groundedness": 0.9, "coherence": 0.9},
+            "failure_reasons": [],
+        }),
+        ("GET", f"/drafts/{draft_id}"): _mock_response(json_data={
+            "draft_id": draft_id, "rfp_id": "RFP-1", "status": "PENDING",
+            "sections": {"eligibility": "Only CLIA-accredited labs may apply."},
+        }),
+    }
+
+
+@pytest.mark.asyncio
+async def test_ai_edit_card_action_success():
+    with patch("bot.httpx.AsyncClient", side_effect=_client_factory(_ai_edit_routes())):
+        ctx = FakeTurnContext(value={
+            "action": "ai_edit_rfp_section", "draft_id": "d1",
+            "section_key": "eligibility", "instruction": "mention CLIA accreditation",
+        })
+        await bot.RfpBotHandler().on_message_activity(ctx)
+
+    assert "Rewriting section" in _text_of(ctx.sent[0])
+    card = _card_of(ctx.sent[-1])
+    assert card["body"][0]["text"] == "✓ Draft Ready — Gate Passed"
+    assert any(b.get("text") == "AI-edited: Eligibility" for b in card["body"])
+
+
+@pytest.mark.asyncio
+async def test_ai_edit_card_action_draft_expired():
+    routes = {("POST", "/drafts/gone/edit/ai"): _mock_response(status_code=404)}
+    with patch("bot.httpx.AsyncClient", side_effect=_client_factory(routes)):
+        ctx = FakeTurnContext(value={
+            "action": "ai_edit_rfp_section", "draft_id": "gone",
+            "section_key": "eligibility", "instruction": "shorten it",
+        })
+        await bot.RfpBotHandler().on_message_activity(ctx)
+
+    assert "may have expired" in _text_of(ctx.sent[-1])
+
+
+@pytest.mark.asyncio
+async def test_ai_edit_card_action_unknown_section_reports_detail():
+    routes = {("POST", "/drafts/d1/edit/ai"): _mock_response(
+        status_code=400, json_data={"detail": "Unknown section: not_a_real_section"},
+    )}
+    with patch("bot.httpx.AsyncClient", side_effect=_client_factory(routes)):
+        ctx = FakeTurnContext(value={
+            "action": "ai_edit_rfp_section", "draft_id": "d1",
+            "section_key": "not_a_real_section", "instruction": "do something",
+        })
+        await bot.RfpBotHandler().on_message_activity(ctx)
+
+    assert "Unknown section: not_a_real_section" in _text_of(ctx.sent[-1])
+
+
+@pytest.mark.asyncio
+async def test_typed_section_edit_resolves_latest_draft():
+    routes = {("GET", "/drafts/latest"): _mock_response(json_data={"draft_id": "d1"}),
+              **_ai_edit_routes()}
+    with patch("bot.httpx.AsyncClient", side_effect=_client_factory(routes)):
+        ctx = FakeTurnContext(text="Edit the eligibility section to mention CLIA accreditation")
+        await bot.RfpBotHandler().on_message_activity(ctx)
+
+    card = _card_of(ctx.sent[-1])
+    assert any(b.get("text") == "AI-edited: Eligibility" for b in card["body"])
+
+
+@pytest.mark.asyncio
+async def test_typed_section_edit_no_draft_yet():
+    routes = {("GET", "/drafts/latest"): _mock_response(status_code=404)}
+    with patch("bot.httpx.AsyncClient", side_effect=_client_factory(routes)):
+        ctx = FakeTurnContext(text="Edit the eligibility section to mention CLIA accreditation")
+        await bot.RfpBotHandler().on_message_activity(ctx)
+
+    assert "No draft to edit yet" in _text_of(ctx.sent[-1])
 
 
 # ── Upload scenario: Teams file attachments routed to proposal review ─────────────

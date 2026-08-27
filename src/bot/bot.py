@@ -235,6 +235,37 @@ def _result_card(event: dict, subtitle: str) -> dict[str, Any]:
                     }],
                 },
             })
+            actions.append({
+                "type": "Action.ShowCard",
+                "title": "🤖 AI Edit",
+                "card": {
+                    "type": "AdaptiveCard",
+                    "body": [
+                        {
+                            "type": "Input.ChoiceSet",
+                            "id": "section_key",
+                            "label": "Section",
+                            "value": next(iter(sections)),
+                            "choices": [
+                                {"title": key.replace("_", " ").title(), "value": key}
+                                for key in sections
+                            ],
+                        },
+                        {
+                            "type": "Input.Text",
+                            "id": "instruction",
+                            "label": "What should change?",
+                            "isMultiline": True,
+                            "placeholder": "e.g. add a mention of CLIA accreditation requirements",
+                        },
+                    ],
+                    "actions": [{
+                        "type": "Action.Submit",
+                        "title": "Rewrite Section",
+                        "data": {"action": "ai_edit_rfp_section", "draft_id": draft_id},
+                    }],
+                },
+            })
 
     return {
         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
@@ -520,7 +551,88 @@ async def _handle_regulatory(turn_context: TurnContext) -> None:
         await turn_context.send_activity(f"Regulatory watch error: {e}")
 
 
+async def _handle_chat_section_edit(turn_context: TurnContext, section_key: str, instruction: str) -> None:
+    """Typed-instruction path — resolves 'which draft' to whichever was most
+    recently generated/edited/rejected (same convention as the Draft Preview
+    tab's /drafts/latest/view), since a plain chat message carries no
+    draft_id the way a card submission does."""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(f"{API_URL}/drafts/latest")
+            if resp.status_code == 404:
+                await turn_context.send_activity("No draft to edit yet — generate one first.")
+                return
+            resp.raise_for_status()
+            draft_id = resp.json()["draft_id"]
+    except Exception as e:
+        await turn_context.send_activity(f"Could not look up the current draft: {e}")
+        return
+    await _apply_ai_edit(turn_context, draft_id, section_key, instruction)
+
+
 # ── Bot handler ─────────────────────────────────────────────────────────────────
+
+async def _apply_ai_edit(turn_context: TurnContext, draft_id: str, section_key: str, instruction: str) -> None:
+    """Shared by the card's 'AI Edit' action and a typed chat instruction —
+    rewrites one section from a natural-language instruction via
+    POST /drafts/{id}/edit/ai, then sends the same result card the manual
+    Edit Section flow uses."""
+    await turn_context.send_activity("Rewriting section and re-evaluating…")
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                f"{API_URL}/drafts/{draft_id}/edit/ai",
+                json={"section_key": section_key, "instruction": instruction},
+            )
+            if resp.status_code == 404:
+                await turn_context.send_activity("Draft not found — it may have expired.")
+                return
+            if resp.status_code == 400:
+                await turn_context.send_activity(resp.json().get("detail", "Unknown section."))
+                return
+            resp.raise_for_status()
+            evaluation = resp.json()
+
+            draft_resp = await client.get(f"{API_URL}/drafts/{draft_id}")
+            draft_resp.raise_for_status()
+            draft_state = draft_resp.json()
+
+        event = {
+            "passed": evaluation["gate_decision"] == "PASS",
+            "scores": evaluation["scores"],
+            "failure_reasons": evaluation["failure_reasons"],
+            "sharepoint_url": "",
+            "draft_id": draft_id,
+            "rfp_id": evaluation["rfp_id"],
+            "sections": draft_state.get("sections", {}),
+            "edited_section_key": section_key,
+        }
+        subtitle = f"AI-edited: {section_key.replace('_', ' ').title()}"
+        card = _result_card(event, subtitle)
+        await turn_context.send_activity(
+            Activity(type=ActivityTypes.message, attachments=[CardFactory.adaptive_card(card)])
+        )
+    except Exception as e:
+        await turn_context.send_activity(f"AI edit failed: {e}")
+
+
+def _extract_section_edit(text: str) -> str | None:
+    """If text reads as a natural-language edit instruction naming a known
+    section (e.g. "edit the eligibility section to mention CLIA
+    accreditation"), returns that section_key. Requires both an edit verb
+    and a section reference so an unrelated message can't accidentally
+    trigger this — e.g. "audit this budget" has no edit verb, "give me an
+    update" has no section reference."""
+    if not re.search(r"\b(edit|change|update|revise|rewrite|modify)\b", text, re.I):
+        return None
+    lower = text.lower()
+    for key in SECTION_ORDER:
+        phrase = key.replace("_", " ")
+        first_word = phrase.split()[0]
+        if phrase in lower or re.search(rf"\b{re.escape(first_word)}\b", lower):
+            return key
+    return None
+
 
 class RfpBotHandler(ActivityHandler):
     async def on_message_activity(self, turn_context: TurnContext):
@@ -599,6 +711,15 @@ class RfpBotHandler(ActivityHandler):
                 await turn_context.send_activity(f"Edit failed: {e}")
             return
 
+        if isinstance(value, dict) and value.get("action") == "ai_edit_rfp_section":
+            await _apply_ai_edit(
+                turn_context,
+                value.get("draft_id", ""),
+                value.get("section_key", ""),
+                value.get("instruction", ""),
+            )
+            return
+
         # Check for file attachments — route directly to proposal review.
         # Two Teams attachment formats:
         #   1. Channel file-share: contentType="application/vnd.microsoft.teams.file.download.info"
@@ -654,6 +775,15 @@ class RfpBotHandler(ActivityHandler):
             await _handle_regulatory(turn_context)
             return
 
+        # No fixed-keyword intent matched — check whether this reads as a typed
+        # edit instruction (e.g. "edit the eligibility section to mention CLIA
+        # accreditation") before falling through to RFP generation.
+        if intent is None:
+            section_key = _extract_section_edit(text)
+            if section_key:
+                await _handle_chat_section_edit(turn_context, section_key, text)
+                return
+
         # generate_rfp or no intent match — try to parse generation params
         params = _parse_rfp_request(text)
         if params is None:
@@ -663,7 +793,8 @@ class RfpBotHandler(ActivityHandler):
                 "- **Review proposal** — paste proposal text\n"
                 "- **Classify** — *Classify: whole genome sequencing surveillance program*\n"
                 "- **Budget audit** — paste a budget narrative\n"
-                "- **Regulatory watch** — *Any recent CFR changes?*"
+                "- **Regulatory watch** — *Any recent CFR changes?*\n"
+                "- **Edit a section** — *Edit the eligibility section to mention CLIA accreditation*"
             )
             return
 

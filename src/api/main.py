@@ -32,7 +32,7 @@ from models import (
     ReviewRequest, ReviewResult, ReviewScore,
     BudgetAuditRequest, BudgetAuditResult, BudgetLineItem,
     RegulatoryWatchResult, RegulatoryAlert,
-    DraftStatus, RejectDraftRequest, EditDraftRequest, DraftStatusResponse,
+    DraftStatus, RejectDraftRequest, EditDraftRequest, AiEditDraftRequest, DraftStatusResponse,
 )
 from sharepoint_client import SharePointClient
 from fabric_client import FabricClient
@@ -447,6 +447,17 @@ async def export_draft(draft_id: str):
     return {"sharepoint_url": sp_url, "draft_id": draft_id, "rfp_id": cached["rfp_id"]}
 
 
+# Registered before /drafts/{draft_id} so the literal "latest" path wins —
+# {draft_id} would otherwise greedily match it first. Backs the chat-typed
+# edit path (bot.py resolves "which draft" this way, same convention as the
+# Draft Preview tab's /drafts/latest/view).
+@app.get("/drafts/latest", response_model=DraftStatusResponse, summary="Get the most recently touched draft's status")
+async def get_latest_draft() -> DraftStatusResponse:
+    if not _last_draft_id or _last_draft_id not in _draft_cache:
+        raise HTTPException(status_code=404, detail="No draft yet")
+    return await get_draft(_last_draft_id)
+
+
 @app.get("/drafts/{draft_id}", response_model=DraftStatusResponse, summary="Get a cached draft's current status")
 async def get_draft(draft_id: str) -> DraftStatusResponse:
     """Look up a cached draft's review status, gate decision, and current sections."""
@@ -508,18 +519,14 @@ async def reject_draft(draft_id: str, body: RejectDraftRequest = RejectDraftRequ
     )
 
 
-@app.post("/drafts/{draft_id}/edit", response_model=EvaluationResult, summary="Edit a draft's sections and re-evaluate")
-async def edit_draft(draft_id: str, body: EditDraftRequest) -> EvaluationResult:
-    """Apply a partial section edit to a cached draft and re-run the evaluation
-    gate against it. Resets status to PENDING — an edit un-decides the draft,
-    including one that was already approved (this does not re-export or
-    retract the earlier SharePoint copy)."""
-    cached = _draft_cache.get(draft_id)
-    if not cached:
-        raise HTTPException(status_code=404, detail="Draft not found")
-
-    cached["sections"].update(body.sections)
-
+async def _reevaluate_and_persist_edit(draft_id: str, cached: dict) -> EvaluationResult:
+    """Shared tail for both /edit (user-typed replacement text) and /edit/ai
+    (LLM-rewritten from an instruction) — cached["sections"] must already
+    reflect the change. Re-runs the gate, resets status to PENDING (an edit
+    un-decides the draft, including one already approved — this does not
+    re-export or retract an earlier SharePoint copy), and archives the new
+    version to Fabric OneLake unconditionally, regardless of the original
+    request's write_to_fabric flag (SharePoint stays approve-only, see /export)."""
     draft = RfpDraft(
         draft_id=draft_id,
         rfp_id=cached["rfp_id"],
@@ -536,11 +543,6 @@ async def edit_draft(draft_id: str, body: EditDraftRequest) -> EvaluationResult:
     global _last_draft_id
     _last_draft_id = draft_id
 
-    # Fabric gets every version unconditionally, regardless of the original
-    # request's write_to_fabric flag — SharePoint stays approve-only (unchanged,
-    # see /export). Each edit increments edit_version so OneLake accumulates
-    # distinct files rather than the static filename silently overwriting the
-    # previous version on every edit.
     if _fabric_client:
         cached["edit_version"] += 1
         md_content = SharePointClient.draft_to_markdown(cached["rfp_id"], cached["sections"])
@@ -558,6 +560,51 @@ async def edit_draft(draft_id: str, body: EditDraftRequest) -> EvaluationResult:
         })
 
     return evaluation
+
+
+@app.post("/drafts/{draft_id}/edit", response_model=EvaluationResult, summary="Edit a draft's sections and re-evaluate")
+async def edit_draft(draft_id: str, body: EditDraftRequest) -> EvaluationResult:
+    """Apply a partial section edit (user-typed replacement text) to a cached
+    draft and re-run the evaluation gate against it."""
+    cached = _draft_cache.get(draft_id)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Draft not found")
+
+    cached["sections"].update(body.sections)
+    return await _reevaluate_and_persist_edit(draft_id, cached)
+
+
+@app.post("/drafts/{draft_id}/edit/ai", response_model=EvaluationResult,
+          summary="Rewrite one section from a natural-language instruction and re-evaluate")
+async def edit_draft_ai(draft_id: str, body: AiEditDraftRequest) -> EvaluationResult:
+    """Like /edit, but the caller supplies an instruction instead of the
+    replacement text — an LLM rewrites the named section to satisfy it. Used
+    by both the card's 'AI Edit' action and a typed chat instruction (e.g.
+    "edit the eligibility section to mention CLIA accreditation")."""
+    cached = _draft_cache.get(draft_id)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    if body.section_key not in cached["sections"]:
+        raise HTTPException(status_code=400, detail=f"Unknown section: {body.section_key}")
+
+    current_text = cached["sections"][body.section_key]
+    content = await _azure_openai_chat([
+        {"role": "system", "content": (
+            "You are editing one section of a federal public health grant RFP. "
+            "Rewrite ONLY the given section's text to satisfy the instruction, keeping a "
+            "professional grant-writing tone and similar length unless the instruction says otherwise. "
+            "Return JSON with key 'new_text' (str) containing the complete replacement text for the section."
+        )},
+        {"role": "user", "content": (
+            f"Section: {body.section_key.replace('_', ' ').title()}\n\n"
+            f"Current text:\n{current_text}\n\n"
+            f"Instruction: {body.instruction}"
+        )},
+    ], max_tokens=1500, json_mode=True)
+    new_text = json.loads(content)["new_text"]
+
+    cached["sections"][body.section_key] = new_text
+    return await _reevaluate_and_persist_edit(draft_id, cached)
 
 
 @app.get("/sharepoint/corpus", summary="List SharePoint corpus files")
