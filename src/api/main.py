@@ -38,7 +38,7 @@ from sharepoint_client import SharePointClient
 from fabric_client import FabricClient
 from observability import setup_observability, tracer, record_generation_span, record_evaluation_span
 from budget_monitor import BudgetMonitor, session_tracker
-from foundry_client import FoundryTracer, FoundryProjectClient
+from foundry_client import FoundryTracer, FoundryProjectClient, ContentSafetyClient
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -65,11 +65,12 @@ _sp_client: Optional[SharePointClient] = None
 _fabric_client: Optional[FabricClient] = None
 _budget_monitor: Optional[BudgetMonitor] = None
 _foundry_project_client: Optional[FoundryProjectClient] = None
+_content_safety_client: Optional[ContentSafetyClient] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _sp_client, _fabric_client, _budget_monitor, _foundry_project_client
+    global _sp_client, _fabric_client, _budget_monitor, _foundry_project_client, _content_safety_client
 
     if SHAREPOINT_SITE_ID:
         _sp_client = SharePointClient(SHAREPOINT_SITE_ID, credential)
@@ -81,6 +82,7 @@ async def lifespan(app: FastAPI):
         _budget_monitor = BudgetMonitor(AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, credential)
         log.info("Budget monitor initialized")
     _foundry_project_client = FoundryProjectClient(credential)
+    _content_safety_client = ContentSafetyClient(credential)
     yield
 
 
@@ -269,6 +271,24 @@ async def _run_evaluation(draft: RfpDraft, request: RfpRequest) -> EvaluationRes
     )
 
 
+async def _check_content_safety(sections: dict[str, str]) -> None:
+    """Hard-blocks on flagged content -- categorically different from a
+    quality-gate failure (a bad score you can still choose to override), so
+    this raises rather than folding into EvaluationResult.failure_reasons.
+    Fails open if Content Safety itself is unreachable/unconfigured (see
+    ContentSafetyClient.is_safe) -- availability of the safety check should
+    not become a reason generation is unavailable entirely."""
+    if not _content_safety_client:
+        return
+    full_text = "\n\n".join(sections.values())
+    is_safe, flagged = await _content_safety_client.is_safe(full_text)
+    if not is_safe:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Content Safety flagged this draft: {', '.join(flagged)}",
+        )
+
+
 async def _persist_draft(draft: RfpDraft, request: RfpRequest, evaluation: EvaluationResult) -> RfpDraft:
     """Persist draft to SharePoint and/or Fabric Lakehouse."""
     sp_url = None
@@ -280,18 +300,25 @@ async def _persist_draft(draft: RfpDraft, request: RfpRequest, evaluation: Evalu
         )
 
     if request.write_to_fabric and _fabric_client:
-        md_content = SharePointClient.draft_to_markdown(draft.rfp_id, draft.sections)
-        fabric_path = await _fabric_client.write_draft_to_lakehouse(draft.draft_id, draft.rfp_id, md_content)
-        await _fabric_client.write_eval_record({
-            "draft_id": draft.draft_id,
-            "rfp_id": draft.rfp_id,
-            "program_area": draft.program_area,
-            "gate_decision": evaluation.gate_decision.value,
-            "scores": evaluation.scores.model_dump(),
-            "failure_reasons": evaluation.failure_reasons,
-            "token_usage": draft.token_usage.model_dump(),
-            "generated_at": draft.generated_at,
-        })
+        try:
+            md_content = SharePointClient.draft_to_markdown(draft.rfp_id, draft.sections)
+            fabric_path = await _fabric_client.write_draft_to_lakehouse(draft.draft_id, draft.rfp_id, md_content)
+            await _fabric_client.write_eval_record({
+                "draft_id": draft.draft_id,
+                "rfp_id": draft.rfp_id,
+                "program_area": draft.program_area,
+                "gate_decision": evaluation.gate_decision.value,
+                "scores": evaluation.scores.model_dump(),
+                "failure_reasons": evaluation.failure_reasons,
+                "token_usage": draft.token_usage.model_dump(),
+                "generated_at": draft.generated_at,
+            })
+        except Exception as e:
+            # Fabric archival is a side-effect, not the point of generation --
+            # a workspace outage/misconfiguration shouldn't turn into a 500
+            # for a draft that was otherwise generated and evaluated fine.
+            log.warning("Fabric write failed for draft %s (continuing without it): %s", draft.draft_id, e)
+            fabric_path = None
 
     return draft.model_copy(update={"sharepoint_url": sp_url, "fabric_lakehouse_path": fabric_path})
 
@@ -311,6 +338,7 @@ async def generate_and_evaluate(request: RfpRequest) -> GenerateAndEvaluateRespo
     """Full pipeline: generate → evaluate gate → optionally persist to SharePoint/Fabric."""
     raw = await _call_orchestrator(request)
     draft = RfpDraft(**raw)
+    await _check_content_safety(draft.sections)
     evaluation = await _run_evaluation(draft, request)
     draft = await _persist_draft(draft, request, evaluation)
 
@@ -410,6 +438,7 @@ async def generate_stream(request: RfpRequest):
                     total_tokens=total_prompt_tokens + total_completion_tokens,
                 ),
             )
+            await _check_content_safety(sections)
             evaluation = await _run_evaluation(draft, request)
             draft = await _persist_draft(draft, request, evaluation)
 
@@ -573,6 +602,7 @@ async def _reevaluate_and_persist_edit(draft_id: str, cached: dict) -> Evaluatio
         sections=cached["sections"],
         token_usage=cached["token_usage"],
     )
+    await _check_content_safety(cached["sections"])
     evaluation = await _run_evaluation(draft, cached["request"])
 
     cached["gate_decision"] = evaluation.gate_decision
@@ -581,20 +611,26 @@ async def _reevaluate_and_persist_edit(draft_id: str, cached: dict) -> Evaluatio
     _last_draft_id = draft_id
 
     if _fabric_client:
-        cached["edit_version"] += 1
-        md_content = SharePointClient.draft_to_markdown(cached["rfp_id"], cached["sections"])
-        await _fabric_client.write_draft_to_lakehouse(
-            draft_id, cached["rfp_id"], md_content, version=cached["edit_version"],
-        )
-        await _fabric_client.write_eval_record({
-            "draft_id": draft_id,
-            "rfp_id": cached["rfp_id"],
-            "program_area": cached["program_area"],
-            "gate_decision": evaluation.gate_decision.value,
-            "scores": evaluation.scores.model_dump(),
-            "failure_reasons": evaluation.failure_reasons,
-            "edit_version": cached["edit_version"],
-        })
+        try:
+            cached["edit_version"] += 1
+            md_content = SharePointClient.draft_to_markdown(cached["rfp_id"], cached["sections"])
+            await _fabric_client.write_draft_to_lakehouse(
+                draft_id, cached["rfp_id"], md_content, version=cached["edit_version"],
+            )
+            await _fabric_client.write_eval_record({
+                "draft_id": draft_id,
+                "rfp_id": cached["rfp_id"],
+                "program_area": cached["program_area"],
+                "gate_decision": evaluation.gate_decision.value,
+                "scores": evaluation.scores.model_dump(),
+                "failure_reasons": evaluation.failure_reasons,
+                "edit_version": cached["edit_version"],
+            })
+        except Exception as e:
+            # Same reasoning as _persist_draft: Fabric archival is a
+            # side-effect of the edit, not the point of it -- a workspace
+            # outage shouldn't turn an otherwise-successful edit into a 500.
+            log.warning("Fabric write failed for edited draft %s (continuing without it): %s", draft_id, e)
 
     return evaluation
 

@@ -122,48 +122,14 @@ else
   echo "      ⚠ src/ingestion/create_index.py not found — skipping ingestion"
 fi
 
-echo "[4/8] Setting up AI Foundry connections"
-# Hub/project names and endpoint come straight from Bicep outputs (azd env set by provision) —
-# always match the current resourceToken, no stale fallback needed.
+echo "[4/8] AI Foundry"
+# Unified AIServices account + project (infra/modules/foundry.bicep) — the
+# account name/endpoint and the AI Search connection are both declared
+# natively in Bicep now (Microsoft.CognitiveServices/accounts/connections),
+# not scripted here. Nothing to provision in this step beyond reporting.
 FOUNDRY_ENDPOINT=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_ENDPOINT)
 FOUNDRY_PROJECT_NAME=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_NAME)
-FOUNDRY_HUB=$(azd env get-value AZURE_AI_FOUNDRY_HUB_NAME)
-FOUNDRY_RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
 echo "      ✓ AI Foundry vars: $FOUNDRY_PROJECT_NAME @ $FOUNDRY_ENDPOINT"
-
-# `az ml connection create` is an upsert — safe to re-run on every provision.
-# AAD credentials only (no api_key): matches this project's "no API keys in
-# configuration" stance everywhere else. Whoever is running this needs RBAC
-# on the OpenAI/Search resources themselves for Studio's playground/prompt
-# flow to actually resolve these connections — same assumption as any other
-# step here that needs subscription-level access to provision things.
-CONN_DIR=$(mktemp -d)
-cat > "$CONN_DIR/aoai-connection.yml" <<EOF
-name: aoai-connection
-type: azure_open_ai
-azure_endpoint: ${OPENAI_ENDPOINT}
-api_version: "2024-06-01"
-EOF
-cat > "$CONN_DIR/search-connection.yml" <<EOF
-name: search-connection
-type: azure_ai_search
-endpoint: ${SEARCH_ENDPOINT}
-EOF
-if az ml connection create --file "$CONN_DIR/aoai-connection.yml" \
-    --resource-group "$FOUNDRY_RESOURCE_GROUP" --workspace-name "$FOUNDRY_PROJECT_NAME" \
-    --output none 2>/dev/null; then
-  echo "      ✓ Azure OpenAI connection ('aoai-connection') created/updated"
-else
-  echo "      ✗ Azure OpenAI connection failed"; FAILED=1
-fi
-if az ml connection create --file "$CONN_DIR/search-connection.yml" \
-    --resource-group "$FOUNDRY_RESOURCE_GROUP" --workspace-name "$FOUNDRY_PROJECT_NAME" \
-    --output none 2>/dev/null; then
-  echo "      ✓ AI Search connection ('search-connection') created/updated"
-else
-  echo "      ✗ AI Search connection failed"; FAILED=1
-fi
-rm -rf "$CONN_DIR"
 
 echo "[5/8] Fabric setup"
 # Like SharePoint (step 7 below), FABRIC_WORKSPACE_ID/FABRIC_LAKEHOUSE_ID are

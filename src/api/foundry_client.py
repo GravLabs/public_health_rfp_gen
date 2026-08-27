@@ -1,31 +1,25 @@
 """
 Azure AI Foundry integration — first-class component of the Public Health RFP POC.
 Responsibilities:
-  1. Evaluations: groundedness and coherence via azure.ai.evaluation SDK
-  2. Content Safety: check generated drafts for harmful content
-  3. Tracing: AI Foundry native tracing for prompt/response spans
-  4. Project metadata: list deployments, connections, evaluation runs
+  1. Content Safety: check generated drafts for harmful content
+  2. Tracing: AI Foundry native tracing for prompt/response spans
+  3. Project metadata: list deployments, connections, evaluation runs
 
-Authentication: DefaultAzureCredential → AzureML Data Scientist role on Foundry project.
+Groundedness/coherence evaluation lives in src/evaluation/evaluators/ instead
+(it needs to run there regardless of which service calls the gate, and shares
+the same azure-ai-evaluation SDK usage pattern this file used to duplicate).
+
+Authentication: DefaultAzureCredential → Cognitive Services OpenAI User role on
+the AI Foundry resource.
 """
 from __future__ import annotations
 
 import logging
 import os
-from typing import Optional, Any
+from typing import Optional
 
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 import httpx
-
-try:
-    from azure.ai.evaluation import (
-        GroundednessEvaluator,
-        CoherenceEvaluator,
-        AzureOpenAIModelConfiguration,
-    )
-    _EVAL_SDK_AVAILABLE = True
-except ImportError:
-    _EVAL_SDK_AVAILABLE = False
 
 log = logging.getLogger(__name__)
 
@@ -33,95 +27,24 @@ log = logging.getLogger(__name__)
 FOUNDRY_PROJECT_ENDPOINT = os.getenv("AZURE_AI_FOUNDRY_PROJECT_ENDPOINT", "")
 FOUNDRY_SUBSCRIPTION_ID = os.getenv("AZURE_SUBSCRIPTION_ID", "")
 FOUNDRY_RESOURCE_GROUP = os.getenv("AZURE_RESOURCE_GROUP", "")
-FOUNDRY_HUB_NAME = os.getenv("AZURE_AI_FOUNDRY_HUB_NAME", "")
 FOUNDRY_PROJECT_NAME = os.getenv("AZURE_AI_FOUNDRY_PROJECT_NAME", "")
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 AZURE_OPENAI_CHAT_DEPLOYMENT = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-4o")
 CONTENT_SAFETY_ENDPOINT = os.getenv("AZURE_CONTENT_SAFETY_ENDPOINT", "")
-
-# Likert 1-5 → 0-1 normalization
-_LIKERT_NORMALIZE = lambda raw: (float(raw) - 1.0) / 4.0
-
-
-class FoundryEvaluatorClient:
-    """Runs AI Foundry SDK evaluators (groundedness, coherence) for the go/no-go gate."""
-
-    def __init__(self, credential: Optional[DefaultAzureCredential] = None):
-        self._credential = credential or DefaultAzureCredential()
-        if _EVAL_SDK_AVAILABLE:
-            self._model_config = AzureOpenAIModelConfiguration(
-                azure_endpoint=AZURE_OPENAI_ENDPOINT,
-                azure_deployment=AZURE_OPENAI_CHAT_DEPLOYMENT,
-            )
-        else:
-            self._model_config = None
-            log.warning("azure-ai-evaluation not installed — Foundry evaluators disabled")
-
-    def evaluate_groundedness(self, query: str, response: str, context: str) -> float:
-        """
-        Score response groundedness against context using AI Foundry.
-        Returns normalized score 0.0–1.0.
-        """
-        if not _EVAL_SDK_AVAILABLE or self._model_config is None:
-            return 0.5
-        try:
-            evaluator = GroundednessEvaluator(model_config=self._model_config)
-            result = evaluator(query=query, response=response, context=context)
-            raw = result.get("groundedness", 3.0)
-            return round(_LIKERT_NORMALIZE(raw), 4)
-        except Exception as e:
-            log.warning("Groundedness evaluation failed: %s", e)
-            return 0.5
-
-    def evaluate_coherence(self, query: str, response: str) -> float:
-        """
-        Score response coherence using AI Foundry.
-        Returns normalized score 0.0–1.0.
-        """
-        if not _EVAL_SDK_AVAILABLE or self._model_config is None:
-            return 0.5
-        try:
-            evaluator = CoherenceEvaluator(model_config=self._model_config)
-            result = evaluator(query=query, response=response)
-            raw = result.get("coherence", 3.0)
-            return round(_LIKERT_NORMALIZE(raw), 4)
-        except Exception as e:
-            log.warning("Coherence evaluation failed: %s", e)
-            return 0.5
-
-    def evaluate_full_draft(
-        self,
-        rfp_id: str,
-        sections: dict[str, str],
-        grounding_context: str,
-    ) -> dict[str, float]:
-        """
-        Run both groundedness and coherence over the full draft.
-        Returns {"groundedness": float, "coherence": float}.
-        """
-        full_text = "\n\n".join(sections.values())
-        query = f"Generate an Public Health Labs cooperative agreement RFP for {rfp_id}"
-
-        groundedness = self.evaluate_groundedness(query, full_text, grounding_context)
-        coherence = self.evaluate_coherence(query, full_text)
-
-        log.info("Foundry eval for %s — groundedness: %.2f, coherence: %.2f",
-                 rfp_id, groundedness, coherence)
-        return {"groundedness": groundedness, "coherence": coherence}
 
 
 class ContentSafetyClient:
     """
     Azure AI Content Safety — checks generated RFP drafts for harmful content.
     Required before returning any draft to the caller.
-    Endpoint: AZURE_CONTENT_SAFETY_ENDPOINT (provisioned in infra/modules/openai.bicep area)
+    Endpoint: AZURE_CONTENT_SAFETY_ENDPOINT — the same unified AI Foundry
+    resource as AZURE_OPENAI_ENDPOINT (infra/modules/foundry.bicep); an
+    AIServices account serves /contentsafety/* alongside /openai/*, no
+    separate resource needed.
     """
 
     def __init__(self, credential: Optional[DefaultAzureCredential] = None):
         self._credential = credential or DefaultAzureCredential()
-        from azure.identity import get_bearer_token_provider
-        from azure.ai.contentsafety import ContentSafetyClient as _AzCS
-        # Lazy import — package may not be installed in all envs
         self._endpoint = CONTENT_SAFETY_ENDPOINT
 
     async def is_safe(self, text: str) -> tuple[bool, list[str]]:
@@ -133,7 +56,6 @@ class ContentSafetyClient:
             log.debug("Content Safety endpoint not configured — skipping check")
             return True, []
 
-        from azure.identity import get_bearer_token_provider
         token = get_bearer_token_provider(
             self._credential, "https://cognitiveservices.azure.com/.default"
         )()
@@ -228,7 +150,6 @@ class FoundryProjectClient:
         return {
             "endpoint": FOUNDRY_PROJECT_ENDPOINT,
             "project_name": FOUNDRY_PROJECT_NAME,
-            "hub_name": FOUNDRY_HUB_NAME,
             "chat_deployment": AZURE_OPENAI_CHAT_DEPLOYMENT,
             "content_safety_configured": bool(CONTENT_SAFETY_ENDPOINT),
         }

@@ -65,18 +65,20 @@ module keyVault 'modules/keyvault.bicep' = {
   }
 }
 
-// Azure OpenAI
-module openAi 'modules/openai.bicep' = {
-  name: 'openai'
+// Azure AI Foundry — unified resource (AIServices account + project), replaces
+// the old openai.bicep + ai-foundry.bicep split. See infra/modules/foundry.bicep.
+module foundry 'modules/foundry.bicep' = {
+  name: 'foundry'
   scope: rg
   params: {
-    name: '${abbrs.cognitiveServicesAccounts}pubhealth-oai-${resourceToken}'
+    name: '${abbrs.cognitiveServicesAccounts}pubhealth-foundry-${resourceToken}'
     location: location
     tags: tags
     identityPrincipalId: identity.outputs.principalId
     gptModelName: openAiModelName
     gptModelVersion: openAiModelVersion
     embeddingModelName: embeddingModelName
+    searchEndpoint: search.outputs.endpoint
   }
 }
 
@@ -117,22 +119,6 @@ module monitoring 'modules/monitoring.bicep' = {
   }
 }
 
-// Azure AI Foundry Hub + Project
-module aiFoundry 'modules/ai-foundry.bicep' = {
-  name: 'aiFoundry'
-  scope: rg
-  params: {
-    hubName: '${abbrs.machineLearningWorkspaces}pubhealth-hub-${resourceToken}'
-    projectName: '${abbrs.machineLearningWorkspaces}pubhealth-rfp-${resourceToken}'
-    location: location
-    tags: tags
-    identityPrincipalId: identity.outputs.principalId
-    mlStorageName: 'stml${resourceToken}'
-    keyVaultResourceId: keyVault.outputs.resourceId
-    appInsightsResourceId: monitoring.outputs.appInsightsId
-  }
-}
-
 // Container Apps Environment + Registry + Container Apps
 module containerApps 'modules/container-apps.bicep' = {
   name: 'containerApps'
@@ -150,7 +136,7 @@ module containerApps 'modules/container-apps.bicep' = {
     orchestratorAppName: 'ca-pubhealth-orch-${resourceToken}'
     orchestratorEnvVars: [
       { name: 'AZURE_CLIENT_ID', value: identity.outputs.clientId }
-      { name: 'AZURE_OPENAI_ENDPOINT', value: openAi.outputs.endpoint }
+      { name: 'AZURE_OPENAI_ENDPOINT', value: foundry.outputs.endpoint }
       { name: 'AZURE_OPENAI_GPT_DEPLOYMENT', value: openAiModelName }
       { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o-mini' }
       { name: 'AZURE_SEARCH_ENDPOINT', value: search.outputs.endpoint }
@@ -166,7 +152,7 @@ module containerApps 'modules/container-apps.bicep' = {
       // override.
       { name: 'OTEL_SERVICE_NAME', value: 'pubhealth-rfp-api' }
       { name: 'AZURE_CLIENT_ID', value: identity.outputs.clientId }
-      { name: 'AZURE_OPENAI_ENDPOINT', value: openAi.outputs.endpoint }
+      { name: 'AZURE_OPENAI_ENDPOINT', value: foundry.outputs.endpoint }
       { name: 'AZURE_OPENAI_GPT_DEPLOYMENT', value: openAiModelName }
       { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o-mini' }
       { name: 'AZURE_OPENAI_O3_DEPLOYMENT', value: 'gpt-4o' }
@@ -178,7 +164,8 @@ module containerApps 'modules/container-apps.bicep' = {
       { name: 'AZURE_STORAGE_CONTAINER', value: 'rfp-corpus' }
       { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: monitoring.outputs.appInsightsConnectionString }
       { name: 'AZURE_APIM_GATEWAY_URL', value: apim.outputs.gatewayUrl }
-      { name: 'AZURE_AI_FOUNDRY_PROJECT_ENDPOINT', value: aiFoundry.outputs.projectEndpoint }
+      { name: 'AZURE_AI_FOUNDRY_PROJECT_ENDPOINT', value: foundry.outputs.projectEndpoint }
+      { name: 'AZURE_CONTENT_SAFETY_ENDPOINT', value: foundry.outputs.endpoint }
       { name: 'MICROSOFT_APP_ID', value: botAppId }
       { name: 'MICROSOFT_APP_PASSWORD', value: botAppSecret }
       { name: 'MICROSOFT_APP_TYPE', value: 'SingleTenant' }
@@ -201,8 +188,8 @@ module apim 'modules/apim.bicep' = {
     location: location
     tags: tags
     publisherEmail: apimPublisherEmail
-    openAiEndpoint: openAi.outputs.endpoint
-    openAiResourceId: openAi.outputs.resourceId
+    openAiEndpoint: foundry.outputs.endpoint
+    openAiResourceId: foundry.outputs.resourceId
     appInsightsId: monitoring.outputs.appInsightsId
     appInsightsInstrumentationKey: monitoring.outputs.instrumentationKey
   }
@@ -237,7 +224,7 @@ output AZURE_LOCATION string = location
 output AZURE_TENANT_ID string = tenant().tenantId
 output AZURE_CLIENT_ID string = identity.outputs.clientId
 
-output AZURE_OPENAI_ENDPOINT string = openAi.outputs.endpoint
+output AZURE_OPENAI_ENDPOINT string = foundry.outputs.endpoint
 output AZURE_OPENAI_GPT_DEPLOYMENT string = openAiModelName
 output AZURE_OPENAI_EMBEDDING_DEPLOYMENT string = embeddingModelName
 
@@ -255,9 +242,10 @@ output AZURE_MONITOR_WORKBOOK_ID string = monitoring.outputs.workbookId
 output AZURE_APIM_GATEWAY_URL string = apim.outputs.gatewayUrl
 output AZURE_APIM_NAME string = apim.outputs.apimName
 
-output AZURE_AI_FOUNDRY_PROJECT_ENDPOINT string = aiFoundry.outputs.projectEndpoint
-output AZURE_AI_FOUNDRY_HUB_NAME string = '${abbrs.machineLearningWorkspaces}pubhealth-hub-${resourceToken}'
-output AZURE_AI_FOUNDRY_PROJECT_NAME string = '${abbrs.machineLearningWorkspaces}pubhealth-rfp-${resourceToken}'
+output AZURE_AI_FOUNDRY_PROJECT_ENDPOINT string = foundry.outputs.projectEndpoint
+output AZURE_AI_FOUNDRY_PROJECT_NAME string = foundry.outputs.projectName
+output AZURE_AI_FOUNDRY_NAME string = foundry.outputs.name
+output AZURE_CONTENT_SAFETY_ENDPOINT string = foundry.outputs.endpoint
 
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerApps.outputs.registryLoginServer
 

@@ -14,3 +14,14 @@ botbuilder-schema==4.16.1
 botbuilder-integration-aiohttp==4.16.1
 pypdf==4.3.1
 Markdown==3.7
+azure-ai-evaluation>=1.0.0
+# botbuilder-integration-aiohttp above hard-pins aiohttp==3.9.5. openai's
+# newer vendored httpx/aiohttp compat transport (pulled in transitively by
+# azure-ai-evaluation) references aiohttp.SocketTimeoutError, which doesn't
+# exist in 3.9.5 -- `pip install` (used by the Docker build, unlike `uv`'s
+# resolver) silently picks a broken combination otherwise, crashing the
+# evaluators' import at runtime. Confirmed live: openai==1.99.0 imports
+# cleanly against aiohttp==3.9.5; the constraint below avoids the newer
+# vendored transport module entirely rather than chasing compatible patch
+# versions of it.
+openai<2.0.0

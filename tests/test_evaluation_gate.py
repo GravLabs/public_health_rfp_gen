@@ -178,3 +178,21 @@ def test_gate_fails_on_incomplete_draft():
     completeness_score = next(s for s in decision.scores if s.metric == "section_completeness")
     assert not completeness_score.passed
     assert any("missing" in r.lower() for r in decision.blocking_failures)
+
+
+# ── Groundedness/coherence evaluators (azure-ai-evaluation SDK) ────────────────
+
+def test_score_groundedness_normalizes_sdk_likert_score():
+    from unittest.mock import patch
+    from evaluators import groundedness
+    with patch.object(groundedness, "_evaluator", return_value={"groundedness": 4.0}):
+        score = groundedness.score_groundedness("Some RFP text.", {"total_funding": 1_000_000})
+    assert abs(score - 0.75) < 1e-6  # (4.0 - 1.0) / 4.0
+
+
+def test_score_coherence_normalizes_sdk_likert_score():
+    from unittest.mock import patch
+    from evaluators import coherence
+    with patch.object(coherence, "_evaluator", return_value={"coherence": 5.0}):
+        score = coherence.score_coherence("Some RFP text.")
+    assert score == 1.0  # (5.0 - 1.0) / 4.0

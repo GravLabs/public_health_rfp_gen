@@ -2,12 +2,12 @@
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
   "manifestVersion": "1.16",
   "version": "1.0.3",
-  "id": "8c22932d-3a37-45aa-8b82-76a483075c3f",
+  "id": "31e32d41-040a-49be-93b1-4bdebf6683e3",
   "developer": {
-    "name": "Your Organization",
-    "websiteUrl": "https://example.com",
-    "privacyUrl": "https://example.com",
-    "termsOfUseUrl": "https://example.com"
+    "name": "Graviton Labs",
+    "websiteUrl": "https://gravitonlabs.com",
+    "privacyUrl": "https://gravitonlabs.com",
+    "termsOfUseUrl": "https://gravitonlabs.com"
   },
   "icons": {
     "color": "color.png",
@@ -26,7 +26,7 @@
     {
       "entityId": "draftPreview",
       "name": "Draft Preview",
-      "contentUrl": "https://ca-pubhealth-api-ies7lsbvjsdiw.jollymushroom-16041296.eastus.azurecontainerapps.io/drafts/latest/view",
+      "contentUrl": "https://ca-pubhealth-api-ies7lsbvjsdiw.mangofield-02d3e784.eastus.azurecontainerapps.io/drafts/latest/view",
       "scopes": [
         "personal"
       ]
@@ -34,7 +34,7 @@
   ],
   "bots": [
     {
-      "botId": "8c22932d-3a37-45aa-8b82-76a483075c3f",
+      "botId": "31e32d41-040a-49be-93b1-4bdebf6683e3",
       "scopes": [
         "personal",
         "team",
@@ -64,6 +64,6 @@
     }
   ],
   "validDomains": [
-    "ca-pubhealth-api-ies7lsbvjsdiw.jollymushroom-16041296.eastus.azurecontainerapps.io"
+    "ca-pubhealth-api-ies7lsbvjsdiw.mangofield-02d3e784.eastus.azurecontainerapps.io"
   ]
 }

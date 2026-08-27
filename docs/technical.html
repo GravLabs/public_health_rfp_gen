@@ -425,9 +425,9 @@ graph TB
           </tr>
           <tr>
             <td><strong>AI Platform</strong></td>
-            <td>AI Foundry Hub + Project, Agent Service, Prompt flows, AI Evaluations, Content Safety</td>
-            <td>DefaultAzureCredential</td>
-            <td>Foundry project endpoint used for all Foundry API calls</td>
+            <td>Unified AI Foundry resource (<code>Microsoft.CognitiveServices/accounts</code>, kind <code>AIServices</code>) + Project — OpenAI deployments, AI Evaluations SDK, Content Safety all on one resource (<code>infra/modules/foundry.bicep</code>, replacing the legacy ML Workspace Hub + Project split)</td>
+            <td>DefaultAzureCredential (Cognitive Services User + Azure AI Developer, the latter scoped to the project)</td>
+            <td>Foundry project endpoint used for the <code>AZURE_AI_FOUNDRY_PROJECT_ENDPOINT</code> env var; <code>AZURE_OPENAI_ENDPOINT</code>/<code>AZURE_CONTENT_SAFETY_ENDPOINT</code> both point at the same account endpoint</td>
           </tr>
           <tr>
             <td><strong>Data</strong></td>
@@ -1267,12 +1267,11 @@ flowchart TD
         <tbody>
           <tr><td class="mono-cell">identity.bicep</td><td>User-Assigned Managed Identity + role assignments</td><td>—</td></tr>
           <tr><td class="mono-cell">storage.bicep</td><td>Storage Account</td><td>Standard_LRS</td></tr>
-          <tr><td class="mono-cell">openai.bicep</td><td>Azure OpenAI (GPT-4o + text-embedding-3-large)</td><td>S0</td></tr>
           <tr><td class="mono-cell">ai-search.bicep</td><td>Azure AI Search</td><td>S1 (POC: Basic)</td></tr>
           <tr><td class="mono-cell">monitoring.bicep</td><td>Log Analytics Workspace + Application Insights</td><td>PerGB2018</td></tr>
           <tr><td class="mono-cell">keyvault.bicep</td><td>Key Vault (APIM subscription keys)</td><td>Standard</td></tr>
           <tr><td class="mono-cell">doc-intelligence.bicep</td><td>Azure Document Intelligence (PDF parsing)</td><td>S0</td></tr>
-          <tr><td class="mono-cell">ai-foundry.bicep</td><td>AI Foundry Hub + Project</td><td>Standard</td></tr>
+          <tr><td class="mono-cell">foundry.bicep</td><td>Unified AI Foundry resource (<code>kind: AIServices</code>) + Project — GPT-4o/GPT-4o-mini/text-embedding-3-small deployments, Content Safety, AI Search connection. Replaces the old <code>openai.bicep</code> + <code>ai-foundry.bicep</code> (legacy ML Workspace Hub + Project) split.</td><td>S0</td></tr>
           <tr><td class="mono-cell">container-apps.bicep</td><td>Container Apps Environment + 2 apps</td><td>Consumption</td></tr>
           <tr><td class="mono-cell">budget.bicep</td><td>Azure Budget + alert action group</td><td>—</td></tr>
           <tr><td class="mono-cell">apim.bicep</td><td>API Management + AI Gateway policies</td><td>Consumption</td></tr>

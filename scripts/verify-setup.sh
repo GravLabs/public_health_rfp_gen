@@ -66,6 +66,7 @@ OAI_ENDPOINT=$(get_env AZURE_OPENAI_ENDPOINT)
 SEARCH_ENDPOINT=$(get_env AZURE_SEARCH_ENDPOINT)
 APPINSIGHTS=$(get_env APPLICATIONINSIGHTS_CONNECTION_STRING)
 FOUNDRY_ENDPOINT=$(get_env AZURE_AI_FOUNDRY_PROJECT_ENDPOINT)
+CONTENT_SAFETY_ENDPOINT=$(get_env AZURE_CONTENT_SAFETY_ENDPOINT)
 
 if [ -n "$SUB_ID" ]; then
   sub_name=$(az account show --subscription "$SUB_ID" --query name -o tsv 2>/dev/null || true)
@@ -82,6 +83,7 @@ fi
 [ -n "$SEARCH_ENDPOINT" ]  && ok "AZURE_SEARCH_ENDPOINT set"           || err "AZURE_SEARCH_ENDPOINT not set — run azd up first"
 [ -n "$APPINSIGHTS" ]      && ok "APPLICATIONINSIGHTS_CONNECTION_STRING set" || warn "APPLICATIONINSIGHTS_CONNECTION_STRING not set"
 [ -n "$FOUNDRY_ENDPOINT" ] && ok "AZURE_AI_FOUNDRY_PROJECT_ENDPOINT set"    || warn "AZURE_AI_FOUNDRY_PROJECT_ENDPOINT not set (set by post-provision hook)"
+[ -n "$CONTENT_SAFETY_ENDPOINT" ] && ok "AZURE_CONTENT_SAFETY_ENDPOINT set" || warn "AZURE_CONTENT_SAFETY_ENDPOINT not set — run azd up first"
 
 # ── Phase 3: Azure Resources ───────────────────────────────────────────────────
 hdr "Phase 3 · Azure Resources"
