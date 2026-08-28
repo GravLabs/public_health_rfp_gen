@@ -80,7 +80,7 @@ See [docs/quickstart.html](docs/quickstart.html) for copy-pasteable commands cov
 | Azure OpenAI | `cog-pubhealth-oai-*` | GPT-4o, gpt-4o-mini, text-embedding-3-small |
 | Document Intelligence | `cog-pubhealth-di-*` | PDF/DOCX parsing |
 | AI Search | `srch-pubhealth-*` | Hybrid + semantic search index |
-| API Management | `apim-pubhealth-*` | AI gateway (Consumption SKU) |
+| API Management | `apim-pubhealth-*` | AI gateway (Standard v2 SKU) — semantic caching, token budgets, usage metrics, JWT-validated access to the Foundry account |
 | Container Registry | `crpubhealth*` | Docker image storage |
 | Container Apps Environment | `cae-pubhealth-*` | API + orchestrator hosting |
 | AI Foundry Hub + Project | `mlw-pubhealth-hub/rfp-*` | AI Foundry project workspace |
@@ -129,7 +129,8 @@ cd tests && pip install -r requirements-test.txt && pytest -v
 | Variable | Value / Source | Used by |
 |---|---|---|
 | `AZURE_SUBSCRIPTION_ID` | Selected subscription ID | azd provision target |
-| `AZURE_OPENAI_ENDPOINT` | OpenAI resource | API, ingestion, evaluation |
+| `AZURE_OPENAI_ENDPOINT` | AI Gateway URL (APIM) for the API/orchestrator containers; raw OpenAI resource for local ingestion tooling | API, orchestrator, evaluation, local ingestion |
+| `AZURE_APIM_GATEWAY_URL` | API Management gateway URL | API, orchestrator |
 | `AZURE_OPENAI_GPT_DEPLOYMENT` | `gpt-4o` | API, orchestrator |
 | `AZURE_OPENAI_MINI_DEPLOYMENT` | `gpt-4o-mini` | Evaluators, classification |
 | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | `text-embedding-3-small` | Ingestion |
@@ -187,12 +188,11 @@ cd tests && pip install -r requirements-test.txt && pytest -v
 
 ## POC Limitations
 
-Two known limitations are accepted for this POC and documented here for production planning:
+One known limitation is accepted for this POC and documented here for production planning:
 
 | Limitation | Impact | Production fix |
 |---|---|---|
 | **Draft cache is in-memory** | If the API container restarts between generation and the user clicking "Approve", the draft is lost and the user sees a 404. (The content itself isn't fully gone — every generation and edit is also archived to Fabric OneLake unconditionally — but re-approving to SharePoint after a restart isn't possible without more code.) | Replace `_draft_cache` in `src/api/main.py` with a Redis cache or Cosmos DB item with a short TTL. |
-| **APIM Consumption SKU** | Token-per-minute limiting, semantic caching, and token metric emission require APIM Standard v2. The Consumption tier used here has none of these. | Upgrade to Standard v2 (~$140/mo) and restore the full policy XML from git history. |
 
 ---
 

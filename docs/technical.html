@@ -293,7 +293,6 @@
     <span class="nav-group-label">Model Gateway</span>
     <a class="nav-link" href="#apim">APIM Gateway</a>
     <a class="nav-link" href="#apim-policy">Policy Lifecycle</a>
-    <a class="nav-link" href="#backend-pool">Backend Pool</a>
     <a class="nav-link" href="#model-routing">Model Routing</a>
   </div>
   <div class="nav-group">
@@ -357,10 +356,10 @@ graph TB
     SK["Semantic Kernel\nOrchestrator (.NET)"]
   end
 
-  subgraph GW["Model Gateway — APIM Consumption"]
+  subgraph GW["Model Gateway — APIM StandardV2"]
     direction TB
-    AP["AI Gateway Policies\n• Managed-identity auth\n• Semantic cache (0.05)\n• Token budget 500K/min\n• emit-token-metric"]
-    BP["Backend Pool\nFine-tuned GPT-4o p1\nBase GPT-4o p2"]
+    AP["AI Gateway Policies\n• validate-jwt (caller auth)\n• Managed-identity auth (to backend)\n• Semantic cache (0.05)\n• Token budget 500K/min\n• emit-token-metric"]
+    BP["Backend\nUnified AI Foundry account"]
   end
 
   subgraph AI["Azure AI Foundry"]
@@ -419,9 +418,9 @@ graph TB
           </tr>
           <tr>
             <td><strong>Model Gateway</strong></td>
-            <td>APIM Consumption SKU</td>
-            <td>SystemAssigned → Cognitive Services User</td>
-            <td>No API keys in application code — APIM holds identity</td>
+            <td>APIM Standard v2 SKU</td>
+            <td>SystemAssigned → Cognitive Services User; callers validated via <code>validate-jwt</code> against the shared managed identity's Entra token — no subscription keys</td>
+            <td>No API keys anywhere — APIM authenticates onward with its own identity, and only accepts callers presenting this app's own AAD token</td>
           </tr>
           <tr>
             <td><strong>AI Platform</strong></td>
@@ -733,21 +732,10 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
   <!-- ── APIM Gateway ────────────────────────────────────────────────────────── -->
   <section id="apim">
     <h2>APIM AI Gateway</h2>
-    <p>API Management Consumption SKU sits between all application code and AI Foundry model deployments. All Azure OpenAI calls route through <code>apim-pubhealth-{token}/openai</code>.</p>
+    <p>API Management Standard v2 sits between all application code and the unified AI Foundry account. All Azure OpenAI calls route through <code>apim-pubhealth-{token}/openai</code>. There are no API keys or subscription keys anywhere in this path (<code>subscriptionRequired: false</code>) — the gateway is opened up with <code>validate-jwt</code> instead, checking that the caller presents a valid Entra token issued to this app's own shared managed identity for the <code>https://cognitiveservices.azure.com</code> audience, the same token every service already fetches via <code>DefaultAzureCredential</code>. APIM then authenticates onward to the Foundry account with its own SystemAssigned identity.</p>
 
-    <h3>Consumers and token budgets</h3>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Subscription</th><th>Consumer</th><th>Token Limit (per min)</th></tr>
-        </thead>
-        <tbody>
-          <tr><td class="mono-cell">sub-generation</td><td>RFP Generation (Foundry Agent + Prompt Flow)</td><td class="right">500,000</td></tr>
-          <tr><td class="mono-cell">sub-evaluation</td><td>Evaluation Gate (5-dimension, direct httpx to gpt-4o-mini)</td><td class="right">500,000</td></tr>
-          <tr><td class="mono-cell">sub-agents</td><td>Specialist Agents (Proposal Review, Regulatory, Audit)</td><td class="right">500,000</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <h3>Token budget</h3>
+    <p>A single <code>azure-openai-token-limit</code> policy applies a 500,000 tokens-per-minute budget, keyed on caller IP rather than per-subscription (there are no subscriptions to key on once <code>subscriptionRequired</code> is off).</p>
   </section>
 
   <!-- ── APIM Policy Lifecycle ───────────────────────────────────────────────── -->
@@ -756,13 +744,13 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
     <div class="diagram">
       <pre class="mermaid">
 flowchart TD
-  REQ["Inbound\nRequest"] --> AUTH["Managed\nIdentity Auth"]
+  REQ["Inbound\nRequest"] --> JWT["validate-jwt\n(caller identity)"]
+  JWT --> AUTH["Managed\nIdentity Auth"]
   AUTH --> CACHE_L["Semantic\nCache Lookup"]
   CACHE_L --> HIT{"Cache\nhit?"}
   HIT -->|yes| RESP["Response"]
   HIT -->|no| LIMIT["Token\nRate Limit"]
-  LIMIT --> ROUTE["Backend\nRouting"]
-  ROUTE --> BACKEND["Backend\nPool"]
+  LIMIT --> BACKEND["Backend\n(AI Foundry account)"]
   BACKEND --> CACHE_S["Cache\nStore 1hr"]
   CACHE_S --> METRIC["Emit\nToken Metrics"]
   METRIC --> RESP
@@ -770,59 +758,39 @@ flowchart TD
     </div>
 
     <pre><code><span class="comment">&lt;!-- Relevant APIM policy snippet (rawxml in apim.bicep) --&gt;</span>
+<span class="kw">&lt;validate-jwt</span> header-name=<span class="str">"Authorization"</span> failed-validation-httpcode=<span class="str">"401"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;openid-config</span> url=<span class="str">"https://login.microsoftonline.com/{tenantId}/v2.0/.well-known/openid-configuration"</span> <span class="kw">/&gt;</span>
+  <span class="kw">&lt;audiences&gt;&lt;audience&gt;</span>https://cognitiveservices.azure.com<span class="kw">&lt;/audience&gt;&lt;/audiences&gt;</span>
+  <span class="kw">&lt;required-claims&gt;&lt;claim</span> name=<span class="str">"appid"</span> match=<span class="str">"any"</span><span class="kw">&gt;&lt;value&gt;</span>{allowedClientId}<span class="kw">&lt;/value&gt;&lt;/claim&gt;&lt;/required-claims&gt;</span>
+<span class="kw">&lt;/validate-jwt&gt;</span>
+
 <span class="kw">&lt;authentication-managed-identity</span> resource=<span class="str">"https://cognitiveservices.azure.com"</span> <span class="kw">/&gt;</span>
 
 <span class="kw">&lt;azure-openai-semantic-caching-lookup</span>
   score-threshold=<span class="str">"0.05"</span>
-  embeddings-backend-id=<span class="str">"openai-base"</span>
+  embeddings-backend-id=<span class="str">"openai"</span>
   embeddings-backend-auth=<span class="str">"system-assigned"</span>
   ignore-system-prompt=<span class="str">"false"</span>
   max-message-count=<span class="str">"10"</span> <span class="kw">/&gt;</span>
 
 <span class="kw">&lt;azure-openai-token-limit</span>
   tokens-per-minute=<span class="str">"500000"</span>
-  counter-key=<span class="str">"@(context.Subscription.Id)"</span>
+  counter-key=<span class="str">"@(context.Request.IpAddress)"</span>
   estimate-prompt-tokens=<span class="str">"true"</span>
   tokens-consumed-header-name=<span class="str">"x-tokens-consumed"</span> <span class="kw">/&gt;</span>
 
-<span class="kw">&lt;azure-openai-emit-token-metric</span> namespace=<span class="str">"PubHealthRfp"</span><span class="kw">&gt;</span>
-  <span class="kw">&lt;dimension</span> name=<span class="str">"consumer"</span>      value=<span class="str">"@(context.Subscription.Name)"</span> <span class="kw">/&gt;</span>
-  <span class="kw">&lt;dimension</span> name=<span class="str">"deployment"</span>    value=<span class="str">"@(context.Request.MatchedParameters[&quot;deploymentId&quot;])"</span> <span class="kw">/&gt;</span>
-  <span class="kw">&lt;dimension</span> name=<span class="str">"program_area"</span>  value=<span class="str">"@(context.Request.Headers.GetValueOrDefault(&quot;x-program-area&quot;,&quot;unknown&quot;))"</span> <span class="kw">/&gt;</span>
-<span class="kw">&lt;/azure-openai-emit-token-metric&gt;</span></code></pre>
-  </section>
+<span class="kw">&lt;set-backend-service</span> backend-id=<span class="str">"openai"</span> <span class="kw">/&gt;</span>
 
-  <!-- ── Backend Pool ────────────────────────────────────────────────────────── -->
-  <section id="backend-pool">
-    <h2>Backend Pool &amp; Circuit Breaking</h2>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Backend</th><th>Priority</th><th>Weight</th><th>Use Case</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="mono-cell">openai-finetuned</td>
-            <td class="right">1</td>
-            <td class="right">100</td>
-            <td>RFP section generation — domain-adapted on 50-RFP corpus</td>
-          </tr>
-          <tr>
-            <td class="mono-cell">openai-base</td>
-            <td class="right">2</td>
-            <td class="right">100</td>
-            <td>Fallback when fine-tuned endpoint throttles or returns 429</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <p>APIM automatically circuits to priority-2 on 429 or 503 from priority-1. The fine-tuned endpoint parameter (<code>openAiFineTunedEndpoint</code>) is optional — when empty, the pool contains only the base backend.</p>
+<span class="kw">&lt;azure-openai-emit-token-metric</span> namespace=<span class="str">"PubHealthRfp"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;dimension</span> name=<span class="str">"deployment"</span>    value=<span class="str">"@(context.Request.MatchedParameters[&quot;deploymentId&quot;])"</span> <span class="kw">/&gt;</span>
+<span class="kw">&lt;/azure-openai-emit-token-metric&gt;</span></code></pre>
+    <p>One backend (<code>openai</code>) fronts the unified AI Foundry account, which serves gpt-4o, gpt-4o-mini, and text-embedding-3-small off a single resource — there's no backend pool or priority-based routing to manage.</p>
   </section>
 
   <!-- ── Model Routing ────────────────────────────────────────────────────────── -->
   <section id="model-routing">
     <h2>Model Routing — Right-Sized Models per Task</h2>
-    <p>All inference routes through APIM. The gateway selects the backend based on the <code>deploymentId</code> path parameter — no application-layer routing logic required.</p>
+    <p>All inference routes through APIM. The <code>deploymentId</code> path parameter selects which model deployment on the Foundry account handles the request — no application-layer routing logic required.</p>
 
     <h3>Model assignment</h3>
     <div class="table-wrap">
@@ -871,30 +839,18 @@ flowchart TD
     </div>
 
     <h3>APIM routing policy</h3>
-    <p>The <code>deploymentId</code> URL parameter is a matched route parameter in the APIM operation template <code>/deployments/{deploymentId}/chat/completions</code>. The policy reads it directly — no custom headers or application code changes needed.</p>
+    <p>The <code>deploymentId</code> URL parameter is a matched route parameter in the APIM operation template <code>/deployments/{deploymentId}/chat/completions</code> (and, for embeddings, <code>/deployments/{deploymentId}/embeddings</code>). The policy reads it directly — no custom headers or application code changes needed. With one backend fronting the whole Foundry account, routing is unconditional:</p>
     <pre><code><span class="comment">&lt;!-- apim.bicep — inbound policy (excerpt) --&gt;</span>
-&lt;choose&gt;
-  &lt;when condition=<span class="str">"@(new[]{&quot;gpt-4o-mini&quot;}.Contains(
-      context.Request.MatchedParameters.GetValueOrDefault(&quot;deploymentId&quot;,&quot;&quot;)))"</span>&gt;
-    &lt;<span class="kw">set-backend-service</span> backend-id=<span class="str">"openai-base"</span> /&gt;
-  &lt;/when&gt;
-  &lt;otherwise&gt;
-    &lt;<span class="kw">set-backend-service</span> backend-id=<span class="str">"openai-pool"</span> /&gt;
-  &lt;/otherwise&gt;
-&lt;/choose&gt;</code></pre>
-
-    <p>The <code>openai-pool</code> backend routes fine-tuned GPT-4o (priority 1) → base GPT-4o (priority 2) for generation. The <code>openai-base</code> backend routes gpt-4o-mini directly — it is not fine-tuned and does not participate in the pool. Note: <code>o3-mini</code> is not available in the eastus region; all reasoning-heavy tasks use GPT-4o.</p>
+&lt;<span class="kw">set-backend-service</span> backend-id=<span class="str">"openai"</span> /&gt;</code></pre>
 
     <h3>Evaluator configuration</h3>
-    <p>The AI Evaluations SDK does not accept <code>DefaultAzureCredential</code> when the endpoint is APIM rather than a direct Azure OpenAI URL. Evaluators use an APIM subscription key (<code>AZURE_APIM_EVALUATION_KEY</code>); APIM authenticates onward to Azure OpenAI via its SystemAssigned managed identity — no OpenAI key is ever held by application code.</p>
+    <p>Evaluators authenticate with <code>DefaultAzureCredential</code> like every other service in this project — no subscription key. <code>credential</code> is passed to the evaluator's own constructor, not embedded in <code>model_config</code> (the SDK's config validation rejects it there).</p>
     <pre><code><span class="comment"># src/evaluation/evaluators/groundedness.py</span>
-model_config = {
-    <span class="str">"azure_endpoint"</span>:   os.getenv(<span class="str">"AZURE_APIM_GATEWAY_URL"</span>),
-    <span class="str">"azure_deployment"</span>: os.getenv(<span class="str">"AZURE_OPENAI_MINI_DEPLOYMENT"</span>, <span class="str">"gpt-4o-mini"</span>),
-    <span class="str">"api_version"</span>:      <span class="str">"2024-06-01"</span>,
-    <span class="str">"api_key"</span>:          os.getenv(<span class="str">"AZURE_APIM_EVALUATION_KEY"</span>),
-}
-evaluator = GroundednessEvaluator(model_config=model_config)</code></pre>
+model_config = AzureOpenAIModelConfiguration(
+    azure_endpoint=os.getenv(<span class="str">"AZURE_OPENAI_ENDPOINT"</span>),   <span class="comment"># the APIM gateway URL</span>
+    azure_deployment=os.getenv(<span class="str">"AZURE_OPENAI_MINI_DEPLOYMENT"</span>, <span class="str">"gpt-4o-mini"</span>),
+)
+evaluator = GroundednessEvaluator(model_config=model_config, credential=DefaultAzureCredential())</code></pre>
 
     <h3>Estimated cost impact</h3>
     <p>Eval gate runs on every generated RFP (~8 sections × 5 evaluators). Routing groundedness and coherence to gpt-4o-mini reduces evaluation cost by approximately <strong>93%</strong> vs. running all evaluation on GPT-4o, with no measurable change in gate accuracy on the evaluation corpus.</p>
@@ -1269,12 +1225,12 @@ flowchart TD
           <tr><td class="mono-cell">storage.bicep</td><td>Storage Account</td><td>Standard_LRS</td></tr>
           <tr><td class="mono-cell">ai-search.bicep</td><td>Azure AI Search</td><td>S1 (POC: Basic)</td></tr>
           <tr><td class="mono-cell">monitoring.bicep</td><td>Log Analytics Workspace + Application Insights</td><td>PerGB2018</td></tr>
-          <tr><td class="mono-cell">keyvault.bicep</td><td>Key Vault (APIM subscription keys)</td><td>Standard</td></tr>
+          <tr><td class="mono-cell">keyvault.bicep</td><td>Key Vault (general secret storage; not used for APIM — the gateway takes no subscription keys)</td><td>Standard</td></tr>
           <tr><td class="mono-cell">doc-intelligence.bicep</td><td>Azure Document Intelligence (PDF parsing)</td><td>S0</td></tr>
           <tr><td class="mono-cell">foundry.bicep</td><td>Unified AI Foundry resource (<code>kind: AIServices</code>) + Project — GPT-4o/GPT-4o-mini/text-embedding-3-small deployments, Content Safety, AI Search connection. Replaces the old <code>openai.bicep</code> + <code>ai-foundry.bicep</code> (legacy ML Workspace Hub + Project) split.</td><td>S0</td></tr>
           <tr><td class="mono-cell">container-apps.bicep</td><td>Container Apps Environment + 2 apps</td><td>Consumption</td></tr>
           <tr><td class="mono-cell">budget.bicep</td><td>Azure Budget + alert action group</td><td>—</td></tr>
-          <tr><td class="mono-cell">apim.bicep</td><td>API Management + AI Gateway policies</td><td>Consumption</td></tr>
+          <tr><td class="mono-cell">apim.bicep</td><td>API Management + AI Gateway policies (JWT validation, semantic caching, token budget, token metrics)</td><td>StandardV2</td></tr>
           <tr><td class="mono-cell">bot-service.bicep</td><td>Azure Bot Service + Teams Channel</td><td>F0 (free)</td></tr>
         </tbody>
       </table>
@@ -1326,10 +1282,10 @@ flowchart TD
           </tr>
           <tr>
             <td>API Management</td>
-            <td>Consumption (first 1M free)</td>
-            <td class="right">$0–5</td>
-            <td>Consumption</td>
-            <td class="right">$49</td>
+            <td>StandardV2, capacity 1</td>
+            <td class="right">$140</td>
+            <td>StandardV2, capacity 2+</td>
+            <td class="right">$280+</td>
           </tr>
           <tr>
             <td>Container Apps</td>

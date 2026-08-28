@@ -136,7 +136,8 @@ module containerApps 'modules/container-apps.bicep' = {
     orchestratorAppName: 'ca-pubhealth-orch-${resourceToken}'
     orchestratorEnvVars: [
       { name: 'AZURE_CLIENT_ID', value: identity.outputs.clientId }
-      { name: 'AZURE_OPENAI_ENDPOINT', value: foundry.outputs.endpoint }
+      { name: 'AZURE_OPENAI_ENDPOINT', value: apim.outputs.gatewayUrl }
+      { name: 'AZURE_APIM_GATEWAY_URL', value: apim.outputs.gatewayUrl }
       { name: 'AZURE_OPENAI_GPT_DEPLOYMENT', value: openAiModelName }
       { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o-mini' }
       { name: 'AZURE_SEARCH_ENDPOINT', value: search.outputs.endpoint }
@@ -152,7 +153,7 @@ module containerApps 'modules/container-apps.bicep' = {
       // override.
       { name: 'OTEL_SERVICE_NAME', value: 'pubhealth-rfp-api' }
       { name: 'AZURE_CLIENT_ID', value: identity.outputs.clientId }
-      { name: 'AZURE_OPENAI_ENDPOINT', value: foundry.outputs.endpoint }
+      { name: 'AZURE_OPENAI_ENDPOINT', value: apim.outputs.gatewayUrl }
       { name: 'AZURE_OPENAI_GPT_DEPLOYMENT', value: openAiModelName }
       { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o-mini' }
       { name: 'AZURE_OPENAI_O3_DEPLOYMENT', value: 'gpt-4o' }
@@ -192,6 +193,8 @@ module apim 'modules/apim.bicep' = {
     openAiResourceId: foundry.outputs.resourceId
     appInsightsId: monitoring.outputs.appInsightsId
     appInsightsInstrumentationKey: monitoring.outputs.instrumentationKey
+    tenantId: tenant().tenantId
+    allowedClientId: identity.outputs.clientId
   }
 }
 

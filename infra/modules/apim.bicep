@@ -1,30 +1,37 @@
 // Azure API Management — AI Gateway
-// Sits between all application code and AI Foundry model deployments.
-// Provides: backend pool load balancing, semantic caching, per-consumer token budgets,
-// rate limiting, circuit breaking, and emit-token-metric for Application Insights.
+// Sits between all application code and the AI Foundry model deployments.
+// Provides: semantic caching, per-caller token budgets, and token-usage
+// metrics emitted to Application Insights — all Standard v2-only policies,
+// see the header note on `apiPolicy` below for why this needed the SKU
+// upgrade from the original Consumption tier.
 //
-// Uses Consumption SKU: first 1M calls/month free, ~$3.50/1M thereafter.
-// SystemAssigned identity is granted Cognitive Services User on the OpenAI resource.
+// Auth: no API keys anywhere in this project, and this gateway is no
+// exception -- callers present the exact same Entra bearer token they
+// already fetch via DefaultAzureCredential for the Foundry resource
+// (audience https://cognitiveservices.azure.com); `validate-jwt` checks it's
+// actually this app's own managed identity before APIM authenticates to the
+// backend on the caller's behalf via its own SystemAssigned identity.
 
 param name string
 param location string
 param tags object = {}
 param publisherEmail string
 param publisherName string = 'Public Health RFP Platform'
-param openAiEndpoint string                // base GPT-4o endpoint
-param openAiFineTunedEndpoint string = ''  // fine-tuned GPT-4o endpoint (optional)
+param openAiEndpoint string
 param openAiResourceId string
 param appInsightsId string
 param appInsightsInstrumentationKey string
+param tenantId string
+param allowedClientId string // the shared user-assigned identity's clientId (identity.bicep) -- the only caller this gateway accepts
 
 // ── APIM service ─────────────────────────────────────────────────────────────
-resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' = {
+resource apim 'Microsoft.ApiManagement/service@2024-05-01' = {
   name: name
   location: location
   tags: tags
   sku: {
-    name: 'Consumption'
-    capacity: 0
+    name: 'StandardV2'
+    capacity: 1
   }
   identity: {
     type: 'SystemAssigned'
@@ -36,7 +43,7 @@ resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' = {
 }
 
 // ── Application Insights logger ───────────────────────────────────────────────
-resource logger 'Microsoft.ApiManagement/service/loggers@2023-09-01-preview' = {
+resource logger 'Microsoft.ApiManagement/service/loggers@2024-05-01' = {
   parent: apim
   name: 'appinsights-logger'
   properties: {
@@ -50,7 +57,7 @@ resource logger 'Microsoft.ApiManagement/service/loggers@2023-09-01-preview' = {
 }
 
 // ── Diagnostic settings (emit token metrics) ──────────────────────────────────
-resource diagnostic 'Microsoft.ApiManagement/service/diagnostics@2023-09-01-preview' = {
+resource diagnostic 'Microsoft.ApiManagement/service/diagnostics@2024-05-01' = {
   parent: apim
   name: 'applicationinsights'
   properties: {
@@ -64,71 +71,38 @@ resource diagnostic 'Microsoft.ApiManagement/service/diagnostics@2023-09-01-prev
   }
 }
 
-// ── Named values for endpoints ────────────────────────────────────────────────
-resource nvOpenAiEndpoint 'Microsoft.ApiManagement/service/namedValues@2023-09-01-preview' = {
+// ── Backend ───────────────────────────────────────────────────────────────────
+// One backend -- the unified AI Foundry account (see infra/modules/foundry.bicep)
+// serves gpt-4o, gpt-4o-mini, and text-embedding-3-small off the same resource,
+// so there's nothing to pool/route between the way the pre-Foundry-migration
+// design assumed (a fine-tuned-vs-base split that was never actually built).
+resource backend 'Microsoft.ApiManagement/service/backends@2024-05-01' = {
   parent: apim
-  name: 'openai-endpoint'
+  name: 'openai'
   properties: {
-    displayName: 'openai-endpoint'
-    value: openAiEndpoint
-    secret: false
-  }
-}
-
-resource nvFineTunedEndpoint 'Microsoft.ApiManagement/service/namedValues@2023-09-01-preview' = if (!empty(openAiFineTunedEndpoint)) {
-  parent: apim
-  name: 'openai-finetuned-endpoint'
-  properties: {
-    displayName: 'openai-finetuned-endpoint'
-    value: openAiFineTunedEndpoint
-    secret: false
-  }
-}
-
-// ── Backends ──────────────────────────────────────────────────────────────────
-resource backendBase 'Microsoft.ApiManagement/service/backends@2023-09-01-preview' = {
-  parent: apim
-  name: 'openai-base'
-  properties: {
-    description: 'Base GPT-4o deployment — used for evaluation and fallback'
+    description: 'Unified AI Foundry account -- chat completions and embeddings'
     url: '${openAiEndpoint}openai'
     protocol: 'http'
     tls: { validateCertificateChain: true, validateCertificateName: true }
   }
 }
 
-resource backendFineTuned 'Microsoft.ApiManagement/service/backends@2023-09-01-preview' = if (!empty(openAiFineTunedEndpoint)) {
-  parent: apim
-  name: 'openai-finetuned'
-  properties: {
-    description: 'Fine-tuned GPT-4o — primary for RFP section generation'
-    url: '${openAiFineTunedEndpoint}openai'
-    protocol: 'http'
-    tls: { validateCertificateChain: true, validateCertificateName: true }
-  }
-}
-
-
 // ── OpenAI API surface ────────────────────────────────────────────────────────
-resource api 'Microsoft.ApiManagement/service/apis@2023-09-01-preview' = {
+resource api 'Microsoft.ApiManagement/service/apis@2024-05-01' = {
   parent: apim
   name: 'pubhealth-openai'
   properties: {
     displayName: 'PubHealth OpenAI Gateway'
-    description: 'AI Gateway — routes to fine-tuned GPT-4o with fallback, semantic caching, token budgets'
+    description: 'AI Gateway — semantic caching, token budgets, usage metrics in front of the Foundry account'
     path: 'openai'
     protocols: ['https']
-    subscriptionRequired: true
-    subscriptionKeyParameterNames: {
-      header: 'api-key'
-      query: 'api-key'
-    }
+    subscriptionRequired: false
     isCurrent: true
   }
 }
 
 // ── API operations ────────────────────────────────────────────────────────────
-resource opChatCompletions 'Microsoft.ApiManagement/service/apis/operations@2023-09-01-preview' = {
+resource opChatCompletions 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
   parent: api
   name: 'chat-completions'
   properties: {
@@ -146,73 +120,96 @@ resource opChatCompletions 'Microsoft.ApiManagement/service/apis/operations@2023
   }
 }
 
+resource opEmbeddings 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
+  parent: api
+  name: 'embeddings'
+  properties: {
+    displayName: 'Embeddings'
+    method: 'POST'
+    urlTemplate: '/deployments/{deploymentId}/embeddings'
+    templateParameters: [
+      { name: 'deploymentId', required: true, type: 'string' }
+    ]
+    request: {
+      queryParameters: [
+        { name: 'api-version', required: true, type: 'string', defaultValue: '2024-08-01-preview' }
+      ]
+    }
+  }
+}
+
 // ── API-level policy ──────────────────────────────────────────────────────────
 // Policies applied to every call through the gateway:
-//   1. Managed identity auth to OpenAI (no keys)
-//   2. Semantic caching (look up, then store on miss)
-//   3. Token rate limit per subscription
-//   4. Emit token usage metrics to App Insights
-//   5. Route to backend pool (fine-tuned → base fallback)
-resource apiPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview' = {
-  parent: api
-  name: 'policy'
-  dependsOn: [
-    backendBase
-  ]
-  properties: {
-    format: 'rawxml'
-    value: '''
+//   1. validate-jwt -- caller must present a valid Entra token for this app's
+//      own managed identity (no API keys anywhere in this project)
+//   2. Managed identity auth from APIM to the Foundry backend
+//   3. Semantic caching (look up, then store on miss) -- Standard v2 only,
+//      removed on the Consumption tier in commit 4543659, restored here
+//   4. Token-per-minute budget -- also Standard v2 only, same history
+//   5. Emit token usage metrics to Application Insights -- ditto
+// No more choose/when routing: one backend now, nothing to route between.
+// Bicep's triple-quoted strings are verbatim -- ${...} is NOT interpolated
+// inside them (that's the whole point: embedding raw XML/JSON safely). The
+// tenant and client ID are therefore templated in via token replacement
+// below rather than string interpolation.
+var openIdConfigUrl = '${environment().authentication.loginEndpoint}${tenantId}/v2.0/.well-known/openid-configuration'
+
+var apiPolicyXmlTemplate = '''
 <policies>
   <inbound>
     <base />
+    <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized">
+      <openid-config url="__OPENID_CONFIG_URL__" />
+      <audiences>
+        <audience>https://cognitiveservices.azure.com</audience>
+        <audience>https://cognitiveservices.azure.com/</audience>
+      </audiences>
+      <required-claims>
+        <claim name="appid" match="any">
+          <value>__ALLOWED_CLIENT_ID__</value>
+        </claim>
+      </required-claims>
+    </validate-jwt>
     <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
-    <set-backend-service backend-id="openai-base" />
+    <azure-openai-semantic-caching-lookup
+      score-threshold="0.05"
+      embeddings-backend-id="openai"
+      embeddings-backend-auth="system-assigned"
+      ignore-system-prompt="false"
+      max-message-count="10" />
+    <azure-openai-token-limit
+      tokens-per-minute="500000"
+      counter-key="@(context.Request.IpAddress)"
+      estimate-prompt-tokens="true"
+      tokens-consumed-header-name="x-tokens-consumed"
+      remaining-tokens-header-name="x-tokens-remaining" />
+    <set-backend-service backend-id="openai" />
   </inbound>
   <backend>
     <base />
   </backend>
   <outbound>
     <base />
+    <azure-openai-semantic-caching-store duration="3600" />
+    <azure-openai-emit-token-metric namespace="PubHealthRfp">
+      <dimension name="deployment" value="@(context.Request.MatchedParameters["deploymentId"])" />
+    </azure-openai-emit-token-metric>
   </outbound>
   <on-error>
     <base />
   </on-error>
 </policies>
-    '''
-  }
-}
+'''
 
-// ── Subscriptions (one per consumer) ─────────────────────────────────────────
-resource subGeneration 'Microsoft.ApiManagement/service/subscriptions@2023-09-01-preview' = {
-  parent: apim
-  name: 'sub-generation'
+resource apiPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-05-01' = {
+  parent: api
+  name: 'policy'
+  dependsOn: [
+    backend
+  ]
   properties: {
-    scope: api.id
-    displayName: 'RFP Generation (Foundry Agent + Prompt Flow)'
-    state: 'active'
-    allowTracing: false
-  }
-}
-
-resource subEvaluation 'Microsoft.ApiManagement/service/subscriptions@2023-09-01-preview' = {
-  parent: apim
-  name: 'sub-evaluation'
-  properties: {
-    scope: api.id
-    displayName: 'Evaluation Gate (Groundedness, Coherence)'
-    state: 'active'
-    allowTracing: false
-  }
-}
-
-resource subAgents 'Microsoft.ApiManagement/service/subscriptions@2023-09-01-preview' = {
-  parent: apim
-  name: 'sub-agents'
-  properties: {
-    scope: api.id
-    displayName: 'Specialist Agents (Review, Regulatory, Audit)'
-    state: 'active'
-    allowTracing: false
+    format: 'rawxml'
+    value: replace(replace(apiPolicyXmlTemplate, '__OPENID_CONFIG_URL__', openIdConfigUrl), '__ALLOWED_CLIENT_ID__', allowedClientId)
   }
 }
 
@@ -233,6 +230,3 @@ resource apimOpenAiRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 output gatewayUrl string = apim.properties.gatewayUrl
 output apimName string = apim.name
 output apimPrincipalId string = apim.identity.principalId
-output generationSubscriptionKeySecretName string = subGeneration.name
-output evaluationSubscriptionKeySecretName string = subEvaluation.name
-output agentsSubscriptionKeySecretName string = subAgents.name
