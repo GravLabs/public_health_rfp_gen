@@ -764,6 +764,15 @@ flowchart TD
     <span class="kw">&lt;audience&gt;</span>https://cognitiveservices.azure.com<span class="kw">&lt;/audience&gt;</span>
     <span class="kw">&lt;audience&gt;</span>https://ai.azure.com<span class="kw">&lt;/audience&gt;</span>
   <span class="kw">&lt;/audiences&gt;</span>
+  <span class="comment">&lt;!-- both issuers required: a managed-identity token for the
+       ai.azure.com audience carries the legacy v1 issuer
+       (sts.windows.net), not the v2 one the openid-config document
+       above declares -- overriding explicitly instead of relying on
+       openid-config's single discovered issuer --&gt;</span>
+  <span class="kw">&lt;issuers&gt;</span>
+    <span class="kw">&lt;issuer&gt;</span>https://sts.windows.net/{tenantId}/<span class="kw">&lt;/issuer&gt;</span>
+    <span class="kw">&lt;issuer&gt;</span>https://login.microsoftonline.com/{tenantId}/v2.0<span class="kw">&lt;/issuer&gt;</span>
+  <span class="kw">&lt;/issuers&gt;</span>
   <span class="kw">&lt;required-claims&gt;&lt;claim</span> name=<span class="str">"appid"</span> match=<span class="str">"any"</span><span class="kw">&gt;&lt;value&gt;</span>{allowedClientId}<span class="kw">&lt;/value&gt;&lt;/claim&gt;&lt;/required-claims&gt;</span>
 <span class="kw">&lt;/validate-jwt&gt;</span>
 
