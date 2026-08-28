@@ -86,6 +86,13 @@ if ($FOUNDRY_PROJECT) {
 }
 
 Write-Host "[5/6] Fabric setup"
+# NOTE: this Windows path has not been updated to match post-provision.sh's
+# idempotent, auto-provisioning Fabric setup (added 2026-08-28) -- it still
+# only checks whether FABRIC_WORKSPACE_ID is cached, and does not re-wire the
+# container's env vars or self-heal after a teardown. Run fabric/setup.py
+# manually (see scripts/post-provision.sh's [5/8] step for the full
+# idempotent flow this should eventually mirror) or use the bash script via
+# WSL/Git Bash for the automated path.
 $FABRIC_WORKSPACE = try { azd env get-value FABRIC_WORKSPACE_ID } catch { "" }
 if ($FABRIC_WORKSPACE) {
     Write-Host "      Fabric workspace already provisioned: $FABRIC_WORKSPACE"
@@ -94,8 +101,9 @@ if ($FABRIC_WORKSPACE) {
     Write-Host "      To provision, run:"
     Write-Host "        python fabric/setup.py ``"
     Write-Host "          --workspace-name pubhealth-rfp-poc ``"
-    Write-Host "          --ai-search-endpoint `$env:AZURE_SEARCH_ENDPOINT ``"
-    Write-Host "          --sharepoint-site-id <YOUR_SITE_ID>"
+    Write-Host "          --sharepoint-site-id <YOUR_SITE_ID> ``"
+    Write-Host "          --tenant-id <YOUR_TENANT_ID> ``"
+    Write-Host "          --api-managed-identity-principal-id <YOUR_IDENTITY_PRINCIPAL_ID>"
 }
 
 Write-Host "[6/6] Writing .env file from AZD environment"

@@ -50,6 +50,58 @@ class FabricClient:
     # ── Workspace and Lakehouse setup ─────────────────────────────────────────
 
     @classmethod
+    async def find_workspace_by_name(cls, workspace_name: str, credential: Optional[DefaultAzureCredential] = None) -> Optional[str]:
+        """Return the ID of an existing workspace with this display name, or
+        None. Used to make re-provisioning idempotent — without this,
+        re-running setup after a teardown would create a second,
+        differently-ID'd workspace every time instead of reusing the one
+        already there (or noticing it's actually gone, per find-then-create
+        in `provision`)."""
+        cred = credential or DefaultAzureCredential()
+        token = get_bearer_token_provider(cred, FABRIC_SCOPE)()
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(f"{FABRIC_BASE}/workspaces", headers={"Authorization": f"Bearer {token}"})
+            resp.raise_for_status()
+        for ws in resp.json().get("value", []):
+            if ws.get("displayName") == workspace_name:
+                return ws["id"]
+        return None
+
+    @classmethod
+    async def find_item_by_name(
+        cls, workspace_id: str, item_name: str, item_type: str, credential: Optional[DefaultAzureCredential] = None,
+    ) -> Optional[str]:
+        """Return the ID of an existing item (Lakehouse, CopyJob, ...) with
+        this display name and type inside the workspace, or None."""
+        cred = credential or DefaultAzureCredential()
+        token = get_bearer_token_provider(cred, FABRIC_SCOPE)()
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(
+                f"{FABRIC_BASE}/workspaces/{workspace_id}/items",
+                headers={"Authorization": f"Bearer {token}"},
+                params={"type": item_type},
+            )
+            resp.raise_for_status()
+        for item in resp.json().get("value", []):
+            if item.get("displayName") == item_name:
+                return item["id"]
+        return None
+
+    @classmethod
+    async def find_connection_by_name(cls, connection_name: str, credential: Optional[DefaultAzureCredential] = None) -> Optional[str]:
+        """Return the ID of an existing Fabric connection with this display
+        name, or None."""
+        cred = credential or DefaultAzureCredential()
+        token = get_bearer_token_provider(cred, FABRIC_SCOPE)()
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(f"{FABRIC_BASE}/connections", headers={"Authorization": f"Bearer {token}"})
+            resp.raise_for_status()
+        for conn in resp.json().get("value", []):
+            if conn.get("displayName") == connection_name:
+                return conn["id"]
+        return None
+
+    @classmethod
     async def provision_workspace(
         cls, workspace_name: str, credential: Optional[DefaultAzureCredential] = None,
         capacity_id: Optional[str] = None,
@@ -167,7 +219,11 @@ class FabricClient:
                 headers=headers,
                 json={"principal": {"id": principal_id, "type": principal_type}, "role": role}
             )
-            resp.raise_for_status()
+            # Re-granting the same principal the same role on re-provision is
+            # the normal idempotent case, not an error -- Fabric 400s with a
+            # message naming the conflict rather than silently no-op'ing.
+            if resp.status_code >= 400 and "already" not in resp.text.lower():
+                resp.raise_for_status()
         log.info("Fabric workspace %s: granted %s role to %s %s", workspace_id, role, principal_type, principal_id)
 
     # Microsoft Graph Command Line Tools — a Microsoft first-party client ID

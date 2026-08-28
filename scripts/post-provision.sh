@@ -132,37 +132,67 @@ FOUNDRY_PROJECT_NAME=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_NAME)
 echo "      ✓ AI Foundry vars: $FOUNDRY_PROJECT_NAME @ $FOUNDRY_ENDPOINT"
 
 echo "[5/8] Fabric setup"
-# Like SharePoint (step 7 below), FABRIC_WORKSPACE_ID/FABRIC_LAKEHOUSE_ID are
-# not provisioned by Bicep — they only ever get set by fabric/setup.py running
-# against a workspace outside this template's scope. Without this re-wiring,
-# a re-provision would leave them cached in azd env but silently missing from
-# the new container, so write_to_fabric writes would just no-op with no error.
-FABRIC_WORKSPACE=$(azd env get-value FABRIC_WORKSPACE_ID 2>/dev/null) || FABRIC_WORKSPACE=""
-if [ -n "$FABRIC_WORKSPACE" ]; then
-  FABRIC_LAKEHOUSE=$(azd env get-value FABRIC_LAKEHOUSE_ID 2>/dev/null || echo "")
+# fabric/setup.py's provision() is idempotent (finds-then-creates the
+# workspace/lakehouse/connection/CopyJob by name, and re-grants the current
+# managed identity's workspace role every time) so it's safe to run on every
+# azd provision, not just once. This also self-heals two failure modes that
+# used to require manual intervention: a torn-down-and-rebuilt resource
+# group orphans both the Fabric workspace (Bicep doesn't manage it) and the
+# shared managed identity's role grant on it (the identity's principalId
+# rotates even when the workspace survives). Gated on SHAREPOINT_SITE_ID
+# being set, same as SharePoint re-wiring in step 7 below -- Fabric
+# ingestion needs a SharePoint site chosen first (install.sh Phase 6).
+#
+# The one step that stays interactive when it's actually needed: granting
+# site-level SharePoint access requires a delegated, human-signed-in Graph
+# token (Microsoft rejects app-only tokens for this specific endpoint,
+# regardless of what permissions they hold) -- provision() only runs that
+# device-code flow when the current workspace identity doesn't match
+# FABRIC_SITE_GRANT_APP_ID from a previous successful run, so ordinary
+# re-provisions (workspace unchanged) don't prompt for anything.
+SP_SITE_ID_FOR_FABRIC=$(azd env get-value SHAREPOINT_SITE_ID 2>/dev/null || echo "")
+if [ -n "$SP_SITE_ID_FOR_FABRIC" ]; then
+  TENANT_ID=$(azd env get-value AZURE_TENANT_ID 2>/dev/null || echo "")
   RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || echo "")
-  API_APP_NAME=$(az containerapp list -g "$RESOURCE_GROUP" \
-    --query "[?tags.\"azd-service-name\"=='api'].name | [0]" -o tsv 2>/dev/null || echo "")
-  API_IMAGE=$(az containerapp show -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
-    --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
-  if [ -n "$API_APP_NAME" ] && [ -n "$API_IMAGE" ]; then
-    az containerapp update -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
-      --image "$API_IMAGE" \
-      --set-env-vars "FABRIC_WORKSPACE_ID=${FABRIC_WORKSPACE}" "FABRIC_LAKEHOUSE_ID=${FABRIC_LAKEHOUSE}" \
-      --revision-suffix "fabricinit$(date +%s)" \
-      --output none \
-      && echo "      ✓ Fabric env vars set on API container: $FABRIC_WORKSPACE" \
-      || { echo "      ✗ Failed to set Fabric env vars on API container"; FAILED=1; }
+  MI_OID_FOR_FABRIC=$(az identity list -g "$RESOURCE_GROUP" --query "[0].principalId" -o tsv 2>/dev/null || echo "")
+  LAST_GRANTED_APP_ID=$(azd env get-value FABRIC_SITE_GRANT_APP_ID 2>/dev/null || echo "")
+
+  if pip3 install --target /tmp/pubhealth-fabric-deps -r fabric/requirements.txt -q 2>/dev/null \
+    || pip3 install --target /tmp/pubhealth-fabric-deps -r fabric/requirements.txt -q; then
+    if PYTHONPATH="/tmp/pubhealth-fabric-deps" python3 fabric/setup.py \
+      --sharepoint-site-id "$SP_SITE_ID_FOR_FABRIC" \
+      --tenant-id "$TENANT_ID" \
+      --api-managed-identity-principal-id "$MI_OID_FOR_FABRIC" \
+      --last-granted-app-id "$LAST_GRANTED_APP_ID" \
+      --set-azd-env; then
+      FABRIC_WORKSPACE=$(azd env get-value FABRIC_WORKSPACE_ID 2>/dev/null || echo "")
+      FABRIC_LAKEHOUSE=$(azd env get-value FABRIC_LAKEHOUSE_ID 2>/dev/null || echo "")
+      API_APP_NAME=$(az containerapp list -g "$RESOURCE_GROUP" \
+        --query "[?tags.\"azd-service-name\"=='api'].name | [0]" -o tsv 2>/dev/null || echo "")
+      API_IMAGE=$(az containerapp show -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
+        --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
+      if [ -n "$API_APP_NAME" ] && [ -n "$API_IMAGE" ]; then
+        az containerapp update -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
+          --image "$API_IMAGE" \
+          --set-env-vars "FABRIC_WORKSPACE_ID=${FABRIC_WORKSPACE}" "FABRIC_LAKEHOUSE_ID=${FABRIC_LAKEHOUSE}" \
+          --revision-suffix "fabricinit$(date +%s)" \
+          --output none \
+          && echo "      ✓ Fabric env vars set on API container: $FABRIC_WORKSPACE" \
+          || { echo "      ✗ Failed to set Fabric env vars on API container"; FAILED=1; }
+      else
+        echo "      ✗ Could not resolve API container app — skipping Fabric env vars"
+        FAILED=1
+      fi
+    else
+      echo "      ⚠ Fabric provisioning failed (non-fatal — e.g. no active trial capacity)."
+      echo "        Draft/eval writes to OneLake will no-op until this is resolved manually."
+    fi
   else
-    echo "      ✗ Could not resolve API container app — skipping Fabric env vars"
+    echo "      ✗ Failed to install fabric/requirements.txt — skipping Fabric setup"
     FAILED=1
   fi
 else
-  echo "      ℹ Fabric not provisioned yet."
-  echo "      To provision, run:"
-  echo "        python fabric/setup.py \\"
-  echo "          --workspace-name pubhealth-rfp-poc \\"
-  echo "          --sharepoint-site-id <YOUR_SITE_ID>"
+  echo "      ℹ SHAREPOINT_SITE_ID not set yet — nothing to provision (run Phase 6 of install.sh first)"
 fi
 
 echo "[6/8] Verifying Teams bot identity (App Registration + Service Principal)"
