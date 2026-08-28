@@ -165,7 +165,7 @@ var apiPolicyXmlTemplate = '''
         <audience>https://cognitiveservices.azure.com/</audience>
         <!-- azure-ai-evaluation's internal prompty engine (GroundednessEvaluator/
              CoherenceEvaluator) requests a token for this audience specifically,
-             not cognitiveservices.azure.com -- confirmed live via a debug
+             not cognitiveservices.azure.com; confirmed live via a debug
              endpoint decoding the actual token claims: same appid (this app's
              identity), different aud. Without this, evaluator calls through
              the gateway get a 401 while everything else (generation, classify)
