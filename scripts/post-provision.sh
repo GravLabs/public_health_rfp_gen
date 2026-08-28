@@ -284,9 +284,11 @@ else
 fi
 echo ""
 echo "Next steps:"
-echo "  1. Run Fabric provisioning:  python fabric/setup.py ..."
-echo "  2. Start orchestrator:       cd src/orchestrator && dotnet run"
-echo "  3. Start API:                cd src/api && uvicorn main:app --reload"
-echo "  4. Run tests:                cd tests && pip install -r requirements-test.txt && pytest -v"
+echo "  1. Start orchestrator:  cd src/orchestrator && dotnet run"
+echo "  2. Start API:           cd src/api && uvicorn main:app --reload"
+echo "  3. Run tests:           cd tests && pip install -r requirements-test.txt && pytest -v"
+echo ""
+echo "(Fabric provisioning runs automatically above in step [5/8] once SHAREPOINT_SITE_ID is set --"
+echo " no separate fabric/setup.py invocation needed.)"
 
 exit "$FAILED"
