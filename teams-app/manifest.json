@@ -26,7 +26,7 @@
     {
       "entityId": "draftPreview",
       "name": "Draft Preview",
-      "contentUrl": "https://ca-pubhealth-api-ies7lsbvjsdiw.mangofield-02d3e784.eastus.azurecontainerapps.io/drafts/latest/view",
+      "contentUrl": "https://ca-pubhealth-api-voipqcqfx45v4.orangesmoke-cef7f5d2.southcentralus.azurecontainerapps.io/drafts/latest/view",
       "scopes": [
         "personal"
       ]
@@ -64,6 +64,6 @@
     }
   ],
   "validDomains": [
-    "ca-pubhealth-api-ies7lsbvjsdiw.mangofield-02d3e784.eastus.azurecontainerapps.io"
+    "ca-pubhealth-api-voipqcqfx45v4.orangesmoke-cef7f5d2.southcentralus.azurecontainerapps.io"
   ]
 }
