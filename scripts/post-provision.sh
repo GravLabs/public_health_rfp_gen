@@ -3,7 +3,7 @@
 # ingestion, AI Foundry/Fabric info, bot identity check, .env write) are
 # independent of each other and of the deploy phase that follows. A single
 # flaky step (e.g. a storage propagation delay) must not skip the rest —
-# in particular the bot identity check (step 6) and .env write (step 7)
+# in particular the bot identity check (step 6) and .env write (step 9)
 # are cheap and important even if ingestion upstream failed. Each risky
 # step below tracks its own failure in $FAILED; the script exits non-zero
 # at the end if anything failed, but always runs every step first.
@@ -40,7 +40,7 @@ APPINSIGHTS_CONN=$(azd env get-value APPLICATIONINSIGHTS_CONNECTION_STRING)
 CONTAINER="rfp-corpus"
 
 echo ""
-echo "[1/8] Uploading sample RFPs to blob storage: ${ACCOUNT}/${CONTAINER}"
+echo "[1/9] Uploading sample RFPs to blob storage: ${ACCOUNT}/${CONTAINER}"
 if [ -d "data/sample-rfps" ]; then
   if wait_for_container "$ACCOUNT" "$CONTAINER"; then
     az storage blob upload-batch \
@@ -58,7 +58,7 @@ else
   echo "      ⚠ data/sample-rfps not found — skipping (add .md files there to populate)"
 fi
 
-echo "[2/8] Uploading eval examples to golden-dataset container"
+echo "[2/9] Uploading eval examples to golden-dataset container"
 if [ -d "data/eval-examples" ]; then
   if wait_for_container "$ACCOUNT" "golden-dataset"; then
     az storage blob upload-batch \
@@ -76,7 +76,7 @@ else
   echo "      ⚠ data/eval-examples not found — skipping (add .json files there to populate)"
 fi
 
-echo "[3/8] Creating AI Search index and running ingestion pipeline"
+echo "[3/9] Creating AI Search index and running ingestion pipeline"
 if [ -f "src/ingestion/create_index.py" ]; then
   export AZURE_SEARCH_ENDPOINT="$SEARCH_ENDPOINT"
   export AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT"
@@ -122,7 +122,7 @@ else
   echo "      ⚠ src/ingestion/create_index.py not found — skipping ingestion"
 fi
 
-echo "[4/8] AI Foundry"
+echo "[4/9] AI Foundry"
 # Unified AIServices account + project (infra/modules/foundry.bicep) — the
 # account name/endpoint and the AI Search connection are both declared
 # natively in Bicep now (Microsoft.CognitiveServices/accounts/connections),
@@ -131,7 +131,7 @@ FOUNDRY_ENDPOINT=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_ENDPOINT)
 FOUNDRY_PROJECT_NAME=$(azd env get-value AZURE_AI_FOUNDRY_PROJECT_NAME)
 echo "      ✓ AI Foundry vars: $FOUNDRY_PROJECT_NAME @ $FOUNDRY_ENDPOINT"
 
-echo "[5/8] Fabric setup"
+echo "[5/9] Fabric setup"
 # fabric/setup.py's provision() is idempotent (finds-then-creates the
 # workspace/lakehouse/connection/CopyJob by name, and re-grants the current
 # managed identity's workspace role every time) so it's safe to run on every
@@ -140,7 +140,7 @@ echo "[5/8] Fabric setup"
 # group orphans both the Fabric workspace (Bicep doesn't manage it) and the
 # shared managed identity's role grant on it (the identity's principalId
 # rotates even when the workspace survives). Gated on SHAREPOINT_SITE_ID
-# being set, same as SharePoint re-wiring in step 7 below -- Fabric
+# being set, same as SharePoint re-wiring in step 8 below -- Fabric
 # ingestion needs a SharePoint site chosen first (install.sh Phase 6).
 #
 # The one step that stays interactive when it's actually needed: granting
@@ -199,7 +199,7 @@ else
   echo "      ℹ SHAREPOINT_SITE_ID not set yet — nothing to provision (run Phase 6 of install.sh first)"
 fi
 
-echo "[6/8] Verifying Teams bot identity (App Registration + Service Principal)"
+echo "[6/9] Verifying Teams bot identity (App Registration + Service Principal)"
 BOT_APP_ID_CHECK=$(azd env get-value BOT_APP_ID 2>/dev/null || echo "")
 if [ -n "$BOT_APP_ID_CHECK" ]; then
   if bot_identity_ensure "$BOT_APP_ID_CHECK"; then
@@ -212,7 +212,69 @@ else
   echo "      · BOT_APP_ID not set yet — nothing to verify (run Phase 2 of install.sh)"
 fi
 
-echo "[7/8] Re-wiring SharePoint (managed identity role + container env vars)"
+echo "[7/9] Syncing Teams app manifest to the live API endpoint"
+# teams-app/manifest.json is a tracked file, not an azd-env value -- but its
+# validDomains and Draft Preview static tab both hard-code the API
+# container's FQDN, which changes on region moves, resource-group
+# recreation, or (with a custom domain not yet in use here) basically any
+# re-provision. Left stale, the Teams app silently 403s the static tab and
+# fails manifest validation on upload -- hit this exact staleness after
+# today's eastus -> South Central US move (bot ID survived a soft-delete
+# restore; the FQDN did not survive at all). Only rewrites the fields that
+# are genuinely environment-derived (id/botId, validDomains, static tab
+# contentUrl) -- name/description/icons/commandLists/accentColor are left
+# alone, so this can't clobber a manual content edit. Gated on
+# TEAMS_APP_DEVELOPER_NAME being cached, since that's only set once,
+# interactively, by install.sh Phase 5 -- first-time setup still goes
+# through that, same pattern as SharePoint/Fabric below.
+DEV_NAME=$(azd env get-value TEAMS_APP_DEVELOPER_NAME 2>/dev/null || echo "")
+if [ -n "$BOT_APP_ID_CHECK" ] && [ -n "$DEV_NAME" ]; then
+  DEV_URL=$(azd env get-value TEAMS_APP_DEVELOPER_URL 2>/dev/null || echo "")
+  # Resolved independently rather than reusing an earlier step's
+  # $RESOURCE_GROUP -- that assignment only happens if the ingestion (step 3)
+  # or Fabric (step 5) branch actually runs, so it can't be relied on here.
+  MANIFEST_RG=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || echo "")
+  MANIFEST_API_APP=$(az containerapp list -g "$MANIFEST_RG" \
+    --query "[?tags.\"azd-service-name\"=='api'].name | [0]" -o tsv 2>/dev/null || echo "")
+  MANIFEST_FQDN=$(az containerapp show -n "$MANIFEST_API_APP" -g "$MANIFEST_RG" \
+    --query "properties.configuration.ingress.fqdn" -o tsv 2>/dev/null || echo "")
+  if [ -n "$MANIFEST_FQDN" ]; then
+    APP_ID="$BOT_APP_ID_CHECK" FQDN="$MANIFEST_FQDN" DEV_NAME="$DEV_NAME" DEV_URL="$DEV_URL" python3 - <<'PYEOF'
+import json, os
+with open('teams-app/manifest.json') as f:
+    d = json.load(f)
+d['id'] = os.environ['APP_ID']
+if d.get('bots'):
+    d['bots'][0]['botId'] = os.environ['APP_ID']
+fqdn = os.environ['FQDN']
+d['validDomains'] = [fqdn]
+if d.get('staticTabs'):
+    d['staticTabs'][0]['contentUrl'] = f'https://{fqdn}/drafts/latest/view'
+d['developer']['name'] = os.environ['DEV_NAME']
+dev_url = os.environ.get('DEV_URL', '')
+if dev_url:
+    d['developer']['websiteUrl'] = dev_url
+    d['developer']['privacyUrl'] = dev_url
+    d['developer']['termsOfUseUrl'] = dev_url
+with open('teams-app/manifest.json', 'w') as f:
+    json.dump(d, f, indent=2)
+    f.write('\n')
+PYEOF
+    if [ -f "teams-app/color.png" ] && [ -f "teams-app/outline.png" ]; then
+      (cd teams-app && zip -j pubhealth-rfp-bot.zip manifest.json color.png outline.png -q) \
+        && echo "      ✓ manifest.json synced to $MANIFEST_FQDN, pubhealth-rfp-bot.zip rebuilt" \
+        || echo "      ✗ manifest.json synced but zip rebuild failed — rebuild manually"
+    else
+      echo "      ✓ manifest.json synced to $MANIFEST_FQDN (icons missing — zip not rebuilt)"
+    fi
+  else
+    echo "      ✗ Could not resolve API container FQDN — skipping manifest sync"
+  fi
+else
+  echo "      · Skipped (BOT_APP_ID or TEAMS_APP_DEVELOPER_NAME not set yet — run Phase 5 of install.sh once)"
+fi
+
+echo "[8/9] Re-wiring SharePoint (managed identity role + container env vars)"
 # SharePoint access is NOT provisioned by Bicep at all — it only ever gets
 # wired up by install.sh Phase 6, which sets SHAREPOINT_SITE_ID in azd env
 # and assigns Sites.ReadWrite.All to the API's managed identity. A fresh
@@ -263,7 +325,7 @@ else
   echo "      · SHAREPOINT_SITE_ID not set — skipping (run: bash scripts/install.sh --from 6)"
 fi
 
-echo "[8/8] Writing .env file from AZD environment"
+echo "[9/9] Writing .env file from AZD environment"
 cat > .env << EOF
 AZURE_SEARCH_ENDPOINT=${SEARCH_ENDPOINT}
 AZURE_OPENAI_ENDPOINT=${OPENAI_ENDPOINT}
