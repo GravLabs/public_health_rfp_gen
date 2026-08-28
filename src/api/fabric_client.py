@@ -139,12 +139,23 @@ class FabricClient:
         return workspace_id
 
     @classmethod
-    async def provision_workspace_identity(cls, workspace_id: str, credential: Optional[DefaultAzureCredential] = None) -> dict:
+    async def provision_workspace_identity(
+        cls, workspace_id: str, credential: Optional[DefaultAzureCredential] = None,
+        poll_attempts: int = 6, poll_interval_s: float = 5.0,
+    ) -> dict:
         """Provision the workspace's own Fabric-managed identity — needed for
         the SharePoint connector's WorkspaceIdentity credential type (see
         create_sharepoint_connection). Idempotent in effect: if one already
         exists, returns it via a plain GET rather than erroring, since the
-        create call 400s with WorkspaceIdentityAlreadyExists on retry."""
+        create call 400s with WorkspaceIdentityAlreadyExists on retry.
+
+        provisionIdentity returns 200 before the identity is actually visible
+        on a GET of the workspace -- confirmed live (reproduced twice): an
+        immediate GET right after a 200 POST comes back without the
+        `workspaceIdentity` key at all, raising KeyError, even though the
+        identity does show up moments later. Polls briefly rather than
+        failing on the very next line after what the API just told us
+        succeeded."""
         cred = credential or DefaultAzureCredential()
         token = get_bearer_token_provider(cred, FABRIC_SCOPE)()
         headers = {"Authorization": f"Bearer {token}", "Content-Length": "0"}
@@ -152,9 +163,20 @@ class FabricClient:
             resp = await client.post(f"{FABRIC_BASE}/workspaces/{workspace_id}/provisionIdentity", headers=headers)
             if resp.status_code >= 400 and "WorkspaceIdentityAlreadyExists" not in resp.text:
                 resp.raise_for_status()
-            get_resp = await client.get(f"{FABRIC_BASE}/workspaces/{workspace_id}", headers={"Authorization": f"Bearer {token}"})
-            get_resp.raise_for_status()
-        identity = get_resp.json()["workspaceIdentity"]
+            for attempt in range(poll_attempts):
+                get_resp = await client.get(f"{FABRIC_BASE}/workspaces/{workspace_id}", headers={"Authorization": f"Bearer {token}"})
+                get_resp.raise_for_status()
+                workspace_identity = get_resp.json().get("workspaceIdentity")
+                if workspace_identity:
+                    identity = workspace_identity
+                    break
+                if attempt < poll_attempts - 1:
+                    await asyncio.sleep(poll_interval_s)
+            else:
+                raise RuntimeError(
+                    f"Workspace {workspace_id}: provisionIdentity succeeded but workspaceIdentity "
+                    f"still wasn't visible after {poll_attempts * poll_interval_s:.0f}s of polling."
+                )
         log.info("Workspace %s identity: appId=%s spId=%s", workspace_id, identity["applicationId"], identity["servicePrincipalId"])
         return identity
 
