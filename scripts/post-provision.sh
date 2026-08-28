@@ -169,11 +169,15 @@ if [ -n "$SP_SITE_ID_FOR_FABRIC" ]; then
       FABRIC_LAKEHOUSE=$(azd env get-value FABRIC_LAKEHOUSE_ID 2>/dev/null || echo "")
       API_APP_NAME=$(az containerapp list -g "$RESOURCE_GROUP" \
         --query "[?tags.\"azd-service-name\"=='api'].name | [0]" -o tsv 2>/dev/null || echo "")
-      API_IMAGE=$(az containerapp show -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
-        --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
-      if [ -n "$API_APP_NAME" ] && [ -n "$API_IMAGE" ]; then
+      # Deliberately NOT passing --image here even though we have it available —
+      # `az containerapp update --set-env-vars --image <same image>` has been
+      # observed live to revert OTHER env vars (e.g. MONTHLY_BUDGET_USD) to a
+      # stale prior value not present in any config file, most likely an ARM
+      # read-after-write race in how that combination rebuilds the revision
+      # template right after a Bicep deployment. --set-env-vars alone (no
+      # --image) reliably preserves the rest of the current template.
+      if [ -n "$API_APP_NAME" ]; then
         az containerapp update -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
-          --image "$API_IMAGE" \
           --set-env-vars "FABRIC_WORKSPACE_ID=${FABRIC_WORKSPACE}" "FABRIC_LAKEHOUSE_ID=${FABRIC_LAKEHOUSE}" \
           --revision-suffix "fabricinit$(date +%s)" \
           --output none \
@@ -237,11 +241,11 @@ if [ -n "$SP_SITE_ID" ]; then
 
     API_APP_NAME=$(az containerapp list -g "$RESOURCE_GROUP" \
       --query "[?tags.\"azd-service-name\"=='api'].name | [0]" -o tsv 2>/dev/null || echo "")
-    API_IMAGE=$(az containerapp show -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
-      --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
-    if [ -n "$API_APP_NAME" ] && [ -n "$API_IMAGE" ]; then
+    # Deliberately NOT passing --image (see the identical comment on the
+    # Fabric step above) -- combining it with --set-env-vars has been
+    # observed to revert other env vars to a stale value.
+    if [ -n "$API_APP_NAME" ]; then
       az containerapp update -n "$API_APP_NAME" -g "$RESOURCE_GROUP" \
-        --image "$API_IMAGE" \
         --set-env-vars "SHAREPOINT_SITE_ID=${SP_SITE_ID}" "SHAREPOINT_DRAFT_LIBRARY=${SP_LIBRARY}" \
         --revision-suffix "spinit$(date +%s)" \
         --output none \
