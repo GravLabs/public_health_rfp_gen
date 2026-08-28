@@ -715,7 +715,7 @@ async def ingest_sharepoint(background_tasks: BackgroundTasks):
 
 @app.get("/budget", summary="Current Azure budget status and LLM cost estimate")
 async def budget_status():
-    """Returns current Azure spend vs $500 budget and per-session LLM cost accumulation."""
+    """Returns current Azure spend vs the monthly budget and per-session LLM cost accumulation."""
     if not _budget_monitor:
         return {
             "status": "budget_monitor_not_configured",

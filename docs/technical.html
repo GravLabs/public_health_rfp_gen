@@ -358,7 +358,7 @@ graph TB
 
   subgraph GW["Model Gateway — APIM StandardV2"]
     direction TB
-    AP["AI Gateway Policies\n• validate-jwt (caller auth)\n• Managed-identity auth (to backend)\n• Semantic cache (0.05)\n• Token budget 500K/min\n• emit-token-metric"]
+    AP["AI Gateway Policies\n• validate-jwt (caller auth)\n• Managed-identity auth (to backend)\n• Token budget 500K/min\n• emit-token-metric"]
     BP["Backend\nUnified AI Foundry account"]
   end
 
@@ -735,7 +735,8 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
     <p>API Management Standard v2 sits between all application code and the unified AI Foundry account. All Azure OpenAI calls route through <code>apim-pubhealth-{token}/openai</code>. There are no API keys or subscription keys anywhere in this path (<code>subscriptionRequired: false</code>) — the gateway is opened up with <code>validate-jwt</code> instead, checking that the caller presents a valid Entra token issued to this app's own shared managed identity for the <code>https://cognitiveservices.azure.com</code> audience, the same token every service already fetches via <code>DefaultAzureCredential</code>. APIM then authenticates onward to the Foundry account with its own SystemAssigned identity.</p>
 
     <h3>Token budget</h3>
-    <p>A single <code>azure-openai-token-limit</code> policy applies a 500,000 tokens-per-minute budget, keyed on caller IP rather than per-subscription (there are no subscriptions to key on once <code>subscriptionRequired</code> is off).</p>
+    <p>A single <code>llm-token-limit</code> policy applies a 500,000 tokens-per-minute budget, keyed on caller IP rather than per-subscription (there are no subscriptions to key on once <code>subscriptionRequired</code> is off).</p>
+    <p><strong>Semantic caching is deferred.</strong> The current <code>llm-semantic-cache-lookup</code>/<code>-store</code> policies require an Azure Managed Redis instance with the RediSearch module enabled, registered as an APIM external cache — a whole additional paid resource this POC doesn't provision. See the README's POC Limitations table.</p>
   </section>
 
   <!-- ── APIM Policy Lifecycle ───────────────────────────────────────────────── -->
@@ -746,14 +747,10 @@ app.MapPost(<span class="str">"/generate/stream"</span>, async (RfpRequest reque
 flowchart TD
   REQ["Inbound\nRequest"] --> JWT["validate-jwt\n(caller identity)"]
   JWT --> AUTH["Managed\nIdentity Auth"]
-  AUTH --> CACHE_L["Semantic\nCache Lookup"]
-  CACHE_L --> HIT{"Cache\nhit?"}
-  HIT -->|yes| RESP["Response"]
-  HIT -->|no| LIMIT["Token\nRate Limit"]
-  LIMIT --> BACKEND["Backend\n(AI Foundry account)"]
-  BACKEND --> CACHE_S["Cache\nStore 1hr"]
-  CACHE_S --> METRIC["Emit\nToken Metrics"]
-  METRIC --> RESP
+  AUTH --> LIMIT["Token\nRate Limit"]
+  LIMIT --> METRIC["Emit\nToken Metrics"]
+  METRIC --> BACKEND["Backend\n(AI Foundry account)"]
+  BACKEND --> RESP["Response"]
       </pre>
     </div>
 
@@ -766,24 +763,17 @@ flowchart TD
 
 <span class="kw">&lt;authentication-managed-identity</span> resource=<span class="str">"https://cognitiveservices.azure.com"</span> <span class="kw">/&gt;</span>
 
-<span class="kw">&lt;azure-openai-semantic-caching-lookup</span>
-  score-threshold=<span class="str">"0.05"</span>
-  embeddings-backend-id=<span class="str">"openai"</span>
-  embeddings-backend-auth=<span class="str">"system-assigned"</span>
-  ignore-system-prompt=<span class="str">"false"</span>
-  max-message-count=<span class="str">"10"</span> <span class="kw">/&gt;</span>
-
-<span class="kw">&lt;azure-openai-token-limit</span>
+<span class="kw">&lt;llm-token-limit</span>
   tokens-per-minute=<span class="str">"500000"</span>
   counter-key=<span class="str">"@(context.Request.IpAddress)"</span>
   estimate-prompt-tokens=<span class="str">"true"</span>
   tokens-consumed-header-name=<span class="str">"x-tokens-consumed"</span> <span class="kw">/&gt;</span>
 
-<span class="kw">&lt;set-backend-service</span> backend-id=<span class="str">"openai"</span> <span class="kw">/&gt;</span>
-
-<span class="kw">&lt;azure-openai-emit-token-metric</span> namespace=<span class="str">"PubHealthRfp"</span><span class="kw">&gt;</span>
+<span class="kw">&lt;llm-emit-token-metric</span> namespace=<span class="str">"PubHealthRfp"</span><span class="kw">&gt;</span>
   <span class="kw">&lt;dimension</span> name=<span class="str">"deployment"</span>    value=<span class="str">"@(context.Request.MatchedParameters[&quot;deploymentId&quot;])"</span> <span class="kw">/&gt;</span>
-<span class="kw">&lt;/azure-openai-emit-token-metric&gt;</span></code></pre>
+<span class="kw">&lt;/llm-emit-token-metric&gt;</span>
+
+<span class="kw">&lt;set-backend-service</span> backend-id=<span class="str">"openai"</span> <span class="kw">/&gt;</span></code></pre>
     <p>One backend (<code>openai</code>) fronts the unified AI Foundry account, which serves gpt-4o, gpt-4o-mini, and text-embedding-3-small off a single resource — there's no backend pool or priority-based routing to manage.</p>
   </section>
 
@@ -1230,7 +1220,7 @@ flowchart TD
           <tr><td class="mono-cell">foundry.bicep</td><td>Unified AI Foundry resource (<code>kind: AIServices</code>) + Project — GPT-4o/GPT-4o-mini/text-embedding-3-small deployments, Content Safety, AI Search connection. Replaces the old <code>openai.bicep</code> + <code>ai-foundry.bicep</code> (legacy ML Workspace Hub + Project) split.</td><td>S0</td></tr>
           <tr><td class="mono-cell">container-apps.bicep</td><td>Container Apps Environment + 2 apps</td><td>Consumption</td></tr>
           <tr><td class="mono-cell">budget.bicep</td><td>Azure Budget + alert action group</td><td>—</td></tr>
-          <tr><td class="mono-cell">apim.bicep</td><td>API Management + AI Gateway policies (JWT validation, semantic caching, token budget, token metrics)</td><td>StandardV2</td></tr>
+          <tr><td class="mono-cell">apim.bicep</td><td>API Management + AI Gateway policies (JWT validation, token budget, token metrics)</td><td>StandardV2</td></tr>
           <tr><td class="mono-cell">bot-service.bicep</td><td>Azure Bot Service + Teams Channel</td><td>F0 (free)</td></tr>
         </tbody>
       </table>
@@ -1245,7 +1235,11 @@ flowchart TD
   <!-- ── Cost Estimate ──────────────────────────────────────────────────────── -->
   <section id="cost">
     <h2>Cost Estimate</h2>
-    <p>POC uses free/trial tiers. Production removes free tiers and sizes for operational SLAs. All prices USD, East US, August 2025 list pricing.</p>
+    <p>The POC column is <strong>measured</strong>, not estimated — pulled from Azure Cost Management for resource group <code>rg-pubhealth-rfp-poc-*</code> (actual-cost query, current billing month) and cross-checked against the Azure Retail Prices API for East US, August 2026. The Production column is a projection for a hypothetical 50-RFPs/month rollout and is not something that can be measured yet.</p>
+
+    <div class="callout amber">
+      <strong>Correction:</strong> an earlier version of this table estimated API Management Standard v2 at $140/mo. The Retail Prices API gives the real meter rate as <strong>$0.9589/hour</strong> ($700/mo for one capacity unit, 730 hrs) — 5x higher. Fixed below.
+    </div>
 
     <div class="table-wrap">
       <table>
@@ -1253,46 +1247,46 @@ flowchart TD
           <tr>
             <th>Component</th>
             <th>POC SKU</th>
-            <th class="right">POC Mo.</th>
+            <th class="right">POC Mo. (measured)</th>
             <th>Prod SKU</th>
-            <th class="right">Prod Mo.</th>
+            <th class="right">Prod Mo. (projected)</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>GPT-4o generation (50 RFPs/mo)</td>
+            <td>Foundry Models — GPT-4o/mini generation + evaluation + embeddings, actual token usage</td>
             <td>Pay-as-you-go</td>
-            <td class="right">$50–80</td>
-            <td>Pay-as-you-go</td>
-            <td class="right">$150–250</td>
-          </tr>
-          <tr>
-            <td>GPT-4o evaluation (5×50 runs)</td>
-            <td>Pay-as-you-go</td>
-            <td class="right">$50–90</td>
-            <td>Pay-as-you-go</td>
-            <td class="right">$130–210</td>
+            <td class="right">$0.90 measured (Aug 24–27 testing) → light POC cadence</td>
+            <td>Pay-as-you-go, 50 RFPs/mo</td>
+            <td class="right">$280–460</td>
           </tr>
           <tr>
             <td>Azure AI Search</td>
-            <td>Basic ($73.73)</td>
+            <td>Basic ($0.101/hr)</td>
             <td class="right">$74</td>
-            <td>S1 ($250.34)</td>
-            <td class="right">$250</td>
+            <td>S1 ($0.336/hr)</td>
+            <td class="right">$245</td>
           </tr>
           <tr>
             <td>API Management</td>
-            <td>StandardV2, capacity 1</td>
-            <td class="right">$140</td>
-            <td>StandardV2, capacity 2+</td>
-            <td class="right">$280+</td>
+            <td>StandardV2, capacity 1 ($0.9589/hr)</td>
+            <td class="right">$700</td>
+            <td>StandardV2, capacity 2 (HA)</td>
+            <td class="right">$1,400</td>
           </tr>
           <tr>
             <td>Container Apps</td>
             <td>Consumption</td>
-            <td class="right">$20–40</td>
+            <td class="right">$5 measured (2 apps, light traffic)</td>
             <td>Dedicated D4</td>
             <td class="right">$40–120</td>
+          </tr>
+          <tr>
+            <td>Container Registry</td>
+            <td>Basic</td>
+            <td class="right">$0.50 measured</td>
+            <td>Basic</td>
+            <td class="right">$5</td>
           </tr>
           <tr>
             <td>Microsoft Fabric</td>
@@ -1304,7 +1298,7 @@ flowchart TD
           <tr>
             <td>Azure Monitor + Storage</td>
             <td>5 GB free</td>
-            <td class="right">$15–25</td>
+            <td class="right">$0.01 measured</td>
             <td>~15 GB/mo</td>
             <td class="right">$40–105</td>
           </tr>
@@ -1318,26 +1312,32 @@ flowchart TD
           <tr>
             <td>Document Intelligence, Key Vault, misc.</td>
             <td>Free tier / S0</td>
-            <td class="right">$0–5</td>
+            <td class="right">&lt;$1 measured</td>
             <td>S0</td>
             <td class="right">$6–30</td>
           </tr>
           <tr class="total-row">
             <td><strong>Total</strong></td>
             <td></td>
-            <td class="right"><strong>$215–320</strong></td>
+            <td class="right"><strong>~$780–800/mo</strong></td>
             <td></td>
-            <td class="right"><strong>$1,075–2,275</strong></td>
+            <td class="right"><strong>$2,426–2,895</strong></td>
           </tr>
         </tbody>
       </table>
     </div>
 
+    <div class="callout info">
+      <strong>Why the POC total jumped from the old ~$215–320 estimate:</strong> the old figure predates both the Foundry unified-resource migration and the APIM Standard v2 upgrade (needed for JWT validation and token-limit/metric policies, unavailable on Consumption). APIM alone is now the largest line item in the POC column. Actual Foundry Models spend stayed low because POC-phase usage is intermittent testing, not the 50-RFP/mo production volume the Prod column assumes.
+    </div>
     <div class="callout amber">
-      <strong>Fabric F2 is the dominant production cost.</strong> Deferring Fabric and using Azure Synapse Analytics serverless (~$5/TB queried) or Power BI PPU ($20/user/mo) saves $400–530/month. Recommended until generation volume justifies dedicated capacity.
+      <strong>Fabric F2 is the dominant remaining production cost.</strong> Deferring Fabric and using Azure Synapse Analytics serverless (~$5/TB queried) or Power BI PPU ($20/user/mo) saves $400–530/month. Recommended until generation volume justifies dedicated capacity.
     </div>
     <div class="callout info">
       <strong>PTU breakeven:</strong> At ~300K tokens/day GPT-4o generation, a PTU reservation becomes cheaper than pay-as-you-go. Below that threshold, pay-as-you-go is lower cost.
+    </div>
+    <div class="callout info">
+      <strong>Budget ceiling:</strong> <code>MONTHLY_BUDGET_USD</code> is set to $2,500 (<code>infra/main.bicep</code>, <code>budget.bicep</code>) — headroom over the measured ~$780–800/mo POC run rate to absorb heavier testing or a partial rollout without re-tuning the alert.
     </div>
   </section>
 

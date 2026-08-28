@@ -80,13 +80,13 @@ See [docs/quickstart.html](docs/quickstart.html) for copy-pasteable commands cov
 | Azure OpenAI | `cog-pubhealth-oai-*` | GPT-4o, gpt-4o-mini, text-embedding-3-small |
 | Document Intelligence | `cog-pubhealth-di-*` | PDF/DOCX parsing |
 | AI Search | `srch-pubhealth-*` | Hybrid + semantic search index |
-| API Management | `apim-pubhealth-*` | AI gateway (Standard v2 SKU) — semantic caching, token budgets, usage metrics, JWT-validated access to the Foundry account |
+| API Management | `apim-pubhealth-*` | AI gateway (Standard v2 SKU) — token budgets, usage metrics, JWT-validated access to the Foundry account |
 | Container Registry | `crpubhealth*` | Docker image storage |
 | Container Apps Environment | `cae-pubhealth-*` | API + orchestrator hosting |
 | AI Foundry Hub + Project | `mlw-pubhealth-hub/rfp-*` | AI Foundry project workspace |
 | Bot Service | `bot-pubhealth-rfp-*` | Teams channel relay |
 | Log Analytics + App Insights | `log-` / `appi-pubhealth-*` | Logs and traces |
-| Budget Alert | `pubhealth-rfp-poc-budget` | $500/mo spend guard |
+| Budget Alert | `pubhealth-rfp-poc-budget` | $2,500/mo spend guard |
 
 ---
 
@@ -188,11 +188,12 @@ cd tests && pip install -r requirements-test.txt && pytest -v
 
 ## POC Limitations
 
-One known limitation is accepted for this POC and documented here for production planning:
+Two known limitations are accepted for this POC and documented here for production planning:
 
 | Limitation | Impact | Production fix |
 |---|---|---|
 | **Draft cache is in-memory** | If the API container restarts between generation and the user clicking "Approve", the draft is lost and the user sees a 404. (The content itself isn't fully gone — every generation and edit is also archived to Fabric OneLake unconditionally — but re-approving to SharePoint after a restart isn't possible without more code.) | Replace `_draft_cache` in `src/api/main.py` with a Redis cache or Cosmos DB item with a short TTL. |
+| **No semantic caching on the AI Gateway** | Every request hits the model, even near-duplicate prompts (e.g. repeated evaluation calls with similar context). `llm-semantic-cache-lookup`/`-store` policies exist in APIM but aren't wired up. | Provision an Azure Managed Redis instance with the RediSearch module enabled, register it as an APIM external cache, and add the two policies to `infra/modules/apim.bicep`'s `apiPolicyXmlTemplate`. |
 
 ---
 

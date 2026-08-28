@@ -1,6 +1,7 @@
 """
 Budget monitoring for the Public Health RFP POC.
-Queries Azure Cost Management to track spend vs the $500/mo budget.
+Queries Azure Cost Management to track spend vs the monthly budget
+(MONTHLY_BUDGET_USD).
 Also estimates per-request LLM costs from token usage.
 Emits warnings via logging and App Insights when thresholds are approached.
 """
@@ -17,14 +18,16 @@ from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 log = logging.getLogger(__name__)
 
-BUDGET_LIMIT_USD = float(os.getenv("MONTHLY_BUDGET_USD", "500"))
+BUDGET_LIMIT_USD = float(os.getenv("MONTHLY_BUDGET_USD", "2500"))
 WARN_THRESHOLD = float(os.getenv("BUDGET_WARN_THRESHOLD", "0.80"))     # 80%
 CRITICAL_THRESHOLD = float(os.getenv("BUDGET_CRITICAL_THRESHOLD", "0.95"))  # 95%
 
 # GPT-4o 2024-08-06 pricing (USD per 1K tokens)
 GPT4O_PROMPT_RATE = 0.0025
 GPT4O_COMPLETION_RATE = 0.010
-EMBEDDING_RATE = 0.00013  # text-embedding-3-large per 1K tokens
+# text-embedding-3-small is the model actually deployed (foundry.bicep) --
+# was previously mislabeled/priced as text-embedding-3-large ($0.00013/1K).
+EMBEDDING_RATE = 0.00002  # text-embedding-3-small per 1K tokens
 
 
 @dataclass

@@ -12,7 +12,7 @@ param openAiModelName string = 'gpt-4o'
 param openAiModelVersion string = '2024-08-06'
 param embeddingModelName string = 'text-embedding-3-small'
 param searchSkuName string = 'basic'
-param budgetAmountUsd int = 500
+param budgetAmountUsd int = 2500
 @description('Client ID of the Azure AD App Registration for the Teams bot — must exist before deploy (msaAppType is SingleTenant, validated at provision time)')
 param botAppId string
 @secure()
@@ -171,7 +171,7 @@ module containerApps 'modules/container-apps.bicep' = {
       { name: 'MICROSOFT_APP_PASSWORD', value: botAppSecret }
       { name: 'MICROSOFT_APP_TYPE', value: 'SingleTenant' }
       { name: 'MICROSOFT_APP_TENANT_ID', value: tenant().tenantId }
-      { name: 'MONTHLY_BUDGET_USD', value: '500' }
+      { name: 'MONTHLY_BUDGET_USD', value: string(budgetAmountUsd) }
       { name: 'BUDGET_WARN_THRESHOLD', value: '0.80' }
       { name: 'BUDGET_CRITICAL_THRESHOLD', value: '0.95' }
       { name: 'GPT4O_PROMPT_COST_PER_1K', value: '0.0025' }
@@ -210,7 +210,7 @@ module botService 'modules/bot-service.bicep' = {
   }
 }
 
-// Azure Budget Alert ($500/mo)
+// Azure Budget Alert ($2,500/mo)
 module budget 'modules/budget.bicep' = {
   name: 'budget'
   scope: rg

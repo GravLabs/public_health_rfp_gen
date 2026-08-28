@@ -693,15 +693,14 @@
         </tr>
       </thead>
       <tbody>
-        <tr><td>AI model costs — generation (GPT-4o fine-tuned)</td><td class="num">$80–140</td><td class="num">$220–370</td></tr>
-        <tr><td>AI model costs — evaluation gate (GPT-4o-mini)</td><td class="num">$8–18</td><td class="num">$22–50</td></tr>
-        <tr><td>Search and retrieval (Azure AI Search)</td><td class="num">$75</td><td class="num">$250</td></tr>
-        <tr><td>API Gateway (Azure API Management)</td><td class="num">$0–5</td><td class="num">$49</td></tr>
-        <tr><td>Application hosting (Container Apps)</td><td class="num">$20–40</td><td class="num">$40–120</td></tr>
+        <tr><td>AI model costs — generation + evaluation + embeddings (GPT-4o, GPT-4o-mini)</td><td class="num">$0.90 measured</td><td class="num">$280–460</td></tr>
+        <tr><td>Search and retrieval (Azure AI Search)</td><td class="num">$74</td><td class="num">$245</td></tr>
+        <tr><td>API Gateway (Azure API Management, Standard v2)</td><td class="num">$700</td><td class="num">$1,400</td></tr>
+        <tr><td>Application hosting (Container Apps)</td><td class="num">$5 measured</td><td class="num">$40–120</td></tr>
         <tr><td>Analytics (Microsoft Fabric)</td><td class="num">$0 trial</td><td class="num">$400–530</td></tr>
-        <tr><td>Monitoring and storage</td><td class="num">$15–25</td><td class="num">$40–105</td></tr>
+        <tr><td>Monitoring, storage, registry, misc.</td><td class="num">$1 measured</td><td class="num">$50–140</td></tr>
         <tr><td>Teams Bot (Azure Bot Service)</td><td class="num">$0</td><td class="num">$10–30</td></tr>
-        <tr class="cost-total"><td><strong>Total</strong></td><td class="num"><strong>$203–318</strong></td><td class="num"><strong>$1,041–2,254</strong></td></tr>
+        <tr class="cost-total"><td><strong>Total</strong></td><td class="num"><strong>~$780–800</strong></td><td class="num"><strong>$2,426–2,895</strong></td></tr>
       </tbody>
     </table>
   </div>
@@ -712,8 +711,11 @@
   <div class="callout green">
     <div><strong>Three cost levers reduce model spend by ~50% overall.</strong> (1) <strong>Model routing</strong>: the evaluation gate runs on GPT-4o-mini (~93% cheaper than GPT-4o) — structured scoring tasks don't need the full model. (2) <strong>Section-tiered generation</strong>: 3 of 8 RFP sections (reporting requirements, budget requirements, submission instructions) are boilerplate and generated on GPT-4o-mini; the remaining 5 creative/grounded sections use the fine-tuned GPT-4o. (3) <strong>Prompt caching</strong>: all 8 section calls share the same system message prefix (parameters + grounding context); Azure OpenAI caches it after section 1, cutting prompt token cost ~50% for sections 2–8.</div>
   </div>
+  <div class="callout info">
+    <div><strong>POC column is measured, not estimated</strong> — pulled directly from Azure Cost Management for the POC resource group, cross-checked against Azure's published meter rates. The Production column remains a projection, since that volume of usage hasn't happened yet. The API Gateway line jumped once real numbers replaced the earlier guess: API Management Standard v2 (needed for the caller-identity checks and per-caller budgets described above) runs $0.9589/hour — about $700/month for one unit — not the ~$0–5/month a Consumption-tier estimate had assumed.</div>
+  </div>
   <div class="callout green">
-    <div><strong>POC budget headroom.</strong> At $203–318/month against a $500 ceiling, the POC phase leaves $182–297 of room — enough to accommodate higher-than-expected generation volume or add 2–3 Teams users during pilot testing.</div>
+    <div><strong>POC budget headroom.</strong> At a measured ~$780–800/month against the $2,500 ceiling, the POC phase leaves roughly $1,700–1,720 of room — enough to absorb heavier testing, a partial pilot rollout, or the API Gateway's fixed cost without re-tuning the budget alert.</div>
   </div>
   <div class="callout amber">
     <div><strong>Real measured cost per draft: $0.04–0.06</strong>, varying with section length (measured directly from live token usage — not an estimate). At that rate, generating and evaluating a full RFP draft costs roughly the same as a cup of coffee split ten ways.</div>

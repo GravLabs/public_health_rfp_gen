@@ -1,9 +1,9 @@
 // Azure API Management — AI Gateway
 // Sits between all application code and the AI Foundry model deployments.
-// Provides: semantic caching, per-caller token budgets, and token-usage
-// metrics emitted to Application Insights — all Standard v2-only policies,
-// see the header note on `apiPolicy` below for why this needed the SKU
-// upgrade from the original Consumption tier.
+// Provides per-caller token budgets and token-usage metrics emitted to
+// Application Insights -- Standard v2-only policies, hence the SKU upgrade
+// from the original Consumption tier. (Semantic caching is deferred -- see
+// the note above the policy template below.)
 //
 // Auth: no API keys anywhere in this project, and this gateway is no
 // exception -- callers present the exact same Entra bearer token they
@@ -143,10 +143,10 @@ resource opEmbeddings 'Microsoft.ApiManagement/service/apis/operations@2024-05-0
 //   1. validate-jwt -- caller must present a valid Entra token for this app's
 //      own managed identity (no API keys anywhere in this project)
 //   2. Managed identity auth from APIM to the Foundry backend
-//   3. Semantic caching (look up, then store on miss) -- Standard v2 only,
+//   3. Token-per-minute budget (llm-token-limit) -- Standard v2 only,
 //      removed on the Consumption tier in commit 4543659, restored here
-//   4. Token-per-minute budget -- also Standard v2 only, same history
-//   5. Emit token usage metrics to Application Insights -- ditto
+//   4. Emit token usage metrics to Application Insights (llm-emit-token-metric)
+//      -- ditto
 // No more choose/when routing: one backend now, nothing to route between.
 // Bicep's triple-quoted strings are verbatim -- ${...} is NOT interpolated
 // inside them (that's the whole point: embedding raw XML/JSON safely). The
@@ -171,18 +171,15 @@ var apiPolicyXmlTemplate = '''
       </required-claims>
     </validate-jwt>
     <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
-    <azure-openai-semantic-caching-lookup
-      score-threshold="0.05"
-      embeddings-backend-id="openai"
-      embeddings-backend-auth="system-assigned"
-      ignore-system-prompt="false"
-      max-message-count="10" />
-    <azure-openai-token-limit
+    <llm-token-limit
       tokens-per-minute="500000"
       counter-key="@(context.Request.IpAddress)"
       estimate-prompt-tokens="true"
       tokens-consumed-header-name="x-tokens-consumed"
       remaining-tokens-header-name="x-tokens-remaining" />
+    <llm-emit-token-metric namespace="PubHealthRfp">
+      <dimension name="deployment" value="@(context.Request.MatchedParameters["deploymentId"])" />
+    </llm-emit-token-metric>
     <set-backend-service backend-id="openai" />
   </inbound>
   <backend>
@@ -190,16 +187,17 @@ var apiPolicyXmlTemplate = '''
   </backend>
   <outbound>
     <base />
-    <azure-openai-semantic-caching-store duration="3600" />
-    <azure-openai-emit-token-metric namespace="PubHealthRfp">
-      <dimension name="deployment" value="@(context.Request.MatchedParameters["deploymentId"])" />
-    </azure-openai-emit-token-metric>
   </outbound>
   <on-error>
     <base />
   </on-error>
 </policies>
 '''
+// Semantic caching (llm-semantic-cache-lookup/-store) is deliberately not
+// wired up here: as of the current AI Gateway docs it requires an Azure
+// Managed Redis instance with the RediSearch module enabled, registered as
+// an APIM external cache -- a whole additional paid resource this POC
+// doesn't provision. Deferred; see README POC Limitations.
 
 resource apiPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-05-01' = {
   parent: api
@@ -217,6 +215,18 @@ resource apiPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-05-01' = 
 var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
 
 resource apimOpenAiRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  // NOTE: this name is necessarily based only on static values -- ARM
+  // requires a role assignment's `name` to be resolvable at the start of
+  // deployment, before a SystemAssigned identity's principalId exists, so
+  // it can't be included here (BCP120). That means if APIM is ever deleted
+  // and recreated, its new SystemAssigned identity gets a new principalId
+  // but this resource keeps the SAME deterministic name, and ARM will
+  // reject the redeploy with RoleAssignmentUpdateNotPermitted ("principal
+  // ID ... not allowed to be updated"). Fix: find and delete the stale
+  // assignment first -- `az role assignment list --resource-group <rg>
+  // --role "Cognitive Services User"`, confirm its principalId no longer
+  // resolves via `az ad sp show`, then `az role assignment delete --ids
+  // <id>` -- before re-running azd provision.
   name: guid(apim.id, openAiResourceId, cognitiveServicesUserRoleId)
   scope: resourceGroup()
   properties: {
