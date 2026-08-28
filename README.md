@@ -166,7 +166,7 @@ cd tests && pip install -r requirements-test.txt && pytest -v
 ├── scripts/
 │   ├── install.sh           # Guided interactive installer (all 6 phases)
 │   ├── verify-setup.sh      # Post-install health check + smoke test
-│   ├── post-provision.sh    # azd post-provision hook (7 steps)
+│   ├── post-provision.sh    # azd post-provision hook (9 steps)
 │   ├── post-deploy.sh       # azd post-deploy hook
 │   └── teardown.sh          # Full resource teardown
 ├── src/
