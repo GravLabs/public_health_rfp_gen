@@ -41,6 +41,20 @@ module identity 'modules/identity.bicep' = {
   }
 }
 
+// Cost Management Reader, scoped to the resource group -- lets the API
+// container's budget_monitor.py query actual/forecasted spend
+// (Microsoft.CostManagement/query) instead of silently falling back to
+// session-only cost estimates. Was missing entirely; AZURE_SUBSCRIPTION_ID
+// and AZURE_RESOURCE_GROUP were also never passed to the container -- see
+// apiEnvVars below.
+module costManagementRole 'modules/cost-management-role.bicep' = {
+  name: 'costManagementRole'
+  scope: rg
+  params: {
+    principalId: identity.outputs.principalId
+  }
+}
+
 // Storage Account (ADLS Gen2 for raw RFP corpus)
 module storage 'modules/storage.bicep' = {
   name: 'storage'
@@ -153,6 +167,8 @@ module containerApps 'modules/container-apps.bicep' = {
       // override.
       { name: 'OTEL_SERVICE_NAME', value: 'pubhealth-rfp-api' }
       { name: 'AZURE_CLIENT_ID', value: identity.outputs.clientId }
+      { name: 'AZURE_SUBSCRIPTION_ID', value: subscription().subscriptionId }
+      { name: 'AZURE_RESOURCE_GROUP', value: rg.name }
       { name: 'AZURE_OPENAI_ENDPOINT', value: apim.outputs.gatewayUrl }
       { name: 'AZURE_OPENAI_GPT_DEPLOYMENT', value: openAiModelName }
       { name: 'AZURE_OPENAI_MINI_DEPLOYMENT', value: 'gpt-4o-mini' }
