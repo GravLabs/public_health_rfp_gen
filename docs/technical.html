@@ -757,7 +757,13 @@ flowchart TD
     <pre><code><span class="comment">&lt;!-- Relevant APIM policy snippet (rawxml in apim.bicep) --&gt;</span>
 <span class="kw">&lt;validate-jwt</span> header-name=<span class="str">"Authorization"</span> failed-validation-httpcode=<span class="str">"401"</span><span class="kw">&gt;</span>
   <span class="kw">&lt;openid-config</span> url=<span class="str">"https://login.microsoftonline.com/{tenantId}/v2.0/.well-known/openid-configuration"</span> <span class="kw">/&gt;</span>
-  <span class="kw">&lt;audiences&gt;&lt;audience&gt;</span>https://cognitiveservices.azure.com<span class="kw">&lt;/audience&gt;&lt;/audiences&gt;</span>
+  <span class="comment">&lt;!-- both audiences required: the evaluation SDK's internal prompty
+       engine requests ai.azure.com tokens, everything else requests
+       cognitiveservices.azure.com -- same appid, different audience --&gt;</span>
+  <span class="kw">&lt;audiences&gt;</span>
+    <span class="kw">&lt;audience&gt;</span>https://cognitiveservices.azure.com<span class="kw">&lt;/audience&gt;</span>
+    <span class="kw">&lt;audience&gt;</span>https://ai.azure.com<span class="kw">&lt;/audience&gt;</span>
+  <span class="kw">&lt;/audiences&gt;</span>
   <span class="kw">&lt;required-claims&gt;&lt;claim</span> name=<span class="str">"appid"</span> match=<span class="str">"any"</span><span class="kw">&gt;&lt;value&gt;</span>{allowedClientId}<span class="kw">&lt;/value&gt;&lt;/claim&gt;&lt;/required-claims&gt;</span>
 <span class="kw">&lt;/validate-jwt&gt;</span>
 
