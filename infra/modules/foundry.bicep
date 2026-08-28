@@ -105,7 +105,12 @@ resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
   name: embeddingModelName
   dependsOn: [miniDeployment]
   sku: {
-    name: 'Standard'
+    // GlobalStandard, not Standard -- some regions (confirmed: southcentralus,
+    // centralus) only offer GlobalStandard/DataZoneStandard for
+    // text-embedding-3-small, not a region-pinned Standard SKU. The other two
+    // deployments in this account already use GlobalStandard, so this also
+    // makes all three consistent.
+    name: 'GlobalStandard'
     capacity: 30
   }
   properties: {
