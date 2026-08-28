@@ -153,6 +153,15 @@ resource opEmbeddings 'Microsoft.ApiManagement/service/apis/operations@2024-05-0
 // tenant and client ID are therefore templated in via token replacement
 // below rather than string interpolation.
 var openIdConfigUrl = '${environment().authentication.loginEndpoint}${tenantId}/v2.0/.well-known/openid-configuration'
+// Managed-identity tokens are inconsistent about v1 vs v2 issuer format
+// depending on the audience requested -- confirmed live: a token for
+// https://cognitiveservices.azure.com/.default carries the v2 issuer below,
+// but the azure-ai-evaluation SDK's https://ai.azure.com/.default token
+// carries the older https://sts.windows.net/{tenantId}/ (v1) issuer instead.
+// openid-config's own single discovered issuer only matches one of these,
+// so both are listed explicitly to override it.
+var issuerV1 = 'https://sts.windows.net/${tenantId}/'
+var issuerV2 = '${environment().authentication.loginEndpoint}${tenantId}/v2.0'
 
 var apiPolicyXmlTemplate = '''
 <policies>
@@ -173,6 +182,10 @@ var apiPolicyXmlTemplate = '''
         <audience>https://ai.azure.com</audience>
         <audience>https://ai.azure.com/</audience>
       </audiences>
+      <issuers>
+        <issuer>__ISSUER_V1__</issuer>
+        <issuer>__ISSUER_V2__</issuer>
+      </issuers>
       <required-claims>
         <claim name="appid" match="any">
           <value>__ALLOWED_CLIENT_ID__</value>
@@ -216,7 +229,11 @@ resource apiPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-05-01' = 
   ]
   properties: {
     format: 'rawxml'
-    value: replace(replace(apiPolicyXmlTemplate, '__OPENID_CONFIG_URL__', openIdConfigUrl), '__ALLOWED_CLIENT_ID__', allowedClientId)
+    value: replace(replace(replace(replace(apiPolicyXmlTemplate,
+      '__OPENID_CONFIG_URL__', openIdConfigUrl),
+      '__ALLOWED_CLIENT_ID__', allowedClientId),
+      '__ISSUER_V1__', issuerV1),
+      '__ISSUER_V2__', issuerV2)
   }
 }
 
